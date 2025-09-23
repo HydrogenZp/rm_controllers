@@ -58,6 +58,7 @@ catkin_package(
 ## Specify additional locations of header files
 include_directories(
         include
+        include/rm_chassis_controllers
         ${catkin_INCLUDE_DIRS}
         ${EIGEN3_INCLUDE_DIR}
 )
@@ -69,6 +70,20 @@ add_library(${PROJECT_NAME}
         src/sentry.cpp
         src/swerve.cpp
         src/balance.cpp
+
+        src/bipedal_wheel_controller/vmc/leg_conv_fwd.c
+        src/bipedal_wheel_controller/vmc/leg_conv.c
+        src/bipedal_wheel_controller/vmc/leg_pos.c
+        src/bipedal_wheel_controller/vmc/leg_spd.c
+        src/bipedal_wheel_controller/dynamics/gen_A.c
+        src/bipedal_wheel_controller/dynamics/gen_B.c
+        src/bipedal_wheel_controller/controller_mode/mode_base.cpp
+        src/bipedal_wheel_controller/controller_mode/mode_manager.cpp
+        src/bipedal_wheel_controller/controller_mode/stand_up.cpp
+        src/bipedal_wheel_controller/controller_mode/sit_down.cpp
+        src/bipedal_wheel_controller/controller_mode/recover.cpp
+        src/bipedal_wheel_controller/controller_mode/normal.cpp
+        src/bipedal_wheel_controller/controller.cpp
 )
 
 ## Specify libraries to link executable targets against
