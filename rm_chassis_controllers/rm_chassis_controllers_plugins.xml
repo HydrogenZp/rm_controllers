@@ -40,6 +40,12 @@
             EffortJointInterface type of hardware interface.
         </description>
     </class>
-
+    <class name="rm_chassis_controllers/VMCController"
+           type="rm_chassis_controllers::VMCController"
+           base_class_type="controller_interface::ControllerBase">
+        <description>
+            The two link vmc controller.
+        </description>
+    </class>
 
 </library>

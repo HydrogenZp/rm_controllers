@@ -84,6 +84,7 @@ add_library(${PROJECT_NAME}
         src/bipedal_wheel_controller/controller_mode/recover.cpp
         src/bipedal_wheel_controller/controller_mode/normal.cpp
         src/bipedal_wheel_controller/controller.cpp
+        src/bipedal_wheel_controller/series_legged_vmc_controller.cpp
 )
 
 ## Specify libraries to link executable targets against

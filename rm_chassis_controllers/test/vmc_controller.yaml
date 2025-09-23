@@ -1,0 +1,14 @@
+controllers:
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 100
+  robot_state_controller:
+    type: robot_state_controller/RobotStateController
+    publish_rate: 100
+  vmc_controller:
+    type: rm_chassis_controllers/VMCController
+    vmc_bias_angle: 1.57
+    pid_length: { p: 900.0, i: 0, d: 40, i_clamp_max: 15.0, i_clamp_min: -15.0, antiwindup: true, publish_state: true }
+    pid_angle: { p: 25.0, i: 0, d: 5, i_clamp_max: 15.0, i_clamp_min: -15.0, antiwindup: true, publish_state: true }
+    thigh_joint: right_hip_joint
+    knee_joint: right_knee_joint
