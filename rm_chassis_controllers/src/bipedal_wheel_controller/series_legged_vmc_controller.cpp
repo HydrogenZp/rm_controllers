@@ -60,8 +60,9 @@ void VMCController::update(const ros::Time& time, const ros::Duration& period)
   double knee_angle = 0, thigh_angle = 0, position[2], speed[2];
 
   // [0]:thigh_vmc_joint [1]:knee_vmc_joint
-  thigh_angle = jointThigh_.getPosition() + M_PI / 2.;
-  knee_angle = jointKnee_.getPosition() - 1.6581;
+  thigh_angle = jointThigh_.getPosition() + M_PI_2;
+  //  knee_angle = jointKnee_.getPosition() - 1.6581;
+  knee_angle = jointKnee_.getPosition() - M_PI_2;
   leg_pos(thigh_angle, knee_angle, position);
   leg_spd(jointThigh_.getVelocity(), jointKnee_.getVelocity(), thigh_angle, knee_angle, speed);
 
