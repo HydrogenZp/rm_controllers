@@ -7,6 +7,7 @@
 #include <ros/time.h>
 #include <Eigen/Dense>
 #include <geometry_msgs/Vector3.h>
+#include <angles/angles.h>
 
 #include "bipedal_wheel_controller/definitions.h"
 
@@ -49,6 +50,7 @@ protected:
   bool left_unstick_{ false }, right_unstick_{ false };
   geometry_msgs::Vector3 angular_vel_base_{}, linear_acc_base_{};
   double roll_, pitch_, yaw_;
+  double yaw_total_{}, yaw_total_last_{};
 };
 
 }  // namespace rm_chassis_controllers

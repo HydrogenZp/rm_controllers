@@ -24,6 +24,13 @@ struct ModelParams
   double g;          // Gravity acceleration
 };
 
+struct BiasParams
+{
+  double x;
+  double pitch;
+  double roll;
+};
+
 struct LegCommand
 {
   double force;     // Thrust

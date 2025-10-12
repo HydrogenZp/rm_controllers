@@ -19,6 +19,7 @@ ModeManager::ModeManager(ros::NodeHandle& controller_nh,
     { "pid_right_leg_theta", &pid_right_leg_theta_ },
     { "pid_left_wheel_vel", &pid_left_wheel_vel_ },
     { "pid_right_wheel_vel", &pid_right_wheel_vel_ },
+    { "pid_yaw_pos", &pid_yaw_pos_ },
   };
   for (const auto& e : pids)
     if (controller_nh.hasParam(e.first) && !e.second->init(ros::NodeHandle(controller_nh, e.first)))
@@ -30,8 +31,9 @@ ModeManager::ModeManager(ros::NodeHandle& controller_nh,
   pid_thetas_.push_back(&pid_left_leg_theta_);
   pid_thetas_.push_back(&pid_right_leg_theta_);
 
-  mode_map_.insert(std::make_pair(BalanceMode::NORMAL, std::make_unique<Normal>(joint_handles, pid_legs_, pid_yaw_vel_,
-                                                                                pid_theta_diff_, pid_roll_)));
+  mode_map_.insert(
+      std::make_pair(BalanceMode::NORMAL, std::make_unique<Normal>(joint_handles, pid_legs_, pid_yaw_pos_, pid_yaw_vel_,
+                                                                   pid_theta_diff_, pid_roll_)));
   mode_map_.insert(
       std::make_pair(BalanceMode::STAND_UP, std::make_unique<StandUp>(joint_handles, pid_legs_, pid_thetas_)));
   mode_map_.insert(

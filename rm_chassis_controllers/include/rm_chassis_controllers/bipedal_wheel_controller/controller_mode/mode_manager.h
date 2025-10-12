@@ -32,7 +32,7 @@ private:
   std::shared_ptr<ModeBase> mode_impl;
   std::map<int, std::shared_ptr<ModeBase>> mode_map_;
 
-  control_toolbox::Pid pid_yaw_vel_, pid_left_leg_, pid_right_leg_, pid_theta_diff_, pid_roll_;
+  control_toolbox::Pid pid_yaw_pos_, pid_yaw_vel_, pid_left_leg_, pid_right_leg_, pid_theta_diff_, pid_roll_;
   control_toolbox::Pid pid_left_leg_theta_, pid_right_leg_theta_;
   control_toolbox::Pid pid_left_wheel_vel_, pid_right_wheel_vel_;
   std::vector<control_toolbox::Pid*> pid_wheels_, pid_legs_, pid_thetas_;

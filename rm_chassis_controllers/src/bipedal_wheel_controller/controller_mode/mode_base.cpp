@@ -33,6 +33,8 @@ void ModeBase::updateBaseState(const geometry_msgs::Vector3& angular_vel_base,
   roll_ = roll;
   pitch_ = pitch;
   yaw_ = yaw;
+  yaw_total_last_ = yaw_total_;
+  yaw_total_ = yaw_total_last_ + angles::shortest_angular_distance(yaw_total_last_, yaw_);
 }
 
 void ModeBase::updateUnstick(const bool& left_unstick, const bool& right_unstick)

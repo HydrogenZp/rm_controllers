@@ -37,8 +37,9 @@ bool BipedalController::init(hardware_interface::RobotHW* robot_hw, ros::NodeHan
 
   mode_manager_ = std::make_unique<ModeManager>(controller_nh, joint_handles_);
   model_params_ = std::make_shared<ModelParams>();
+  bias_params_ = std::make_shared<BiasParams>();
 
-  if (!setupModelParams(controller_nh) || !setupLQR(controller_nh))
+  if (!setupModelParams(controller_nh) || !setupLQR(controller_nh) || !setupBiasParams(controller_nh))
     return false;
 
   auto legCmdCallback = [this](const rm_msgs::LegCmd::ConstPtr& msg) {
@@ -109,12 +110,14 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
   // vmc
   double left_angle[2]{}, right_angle[2]{}, left_pos[2]{}, left_spd[2]{}, right_pos[2]{}, right_spd[2]{};
   // [0]:hip_vmc_joint [1]:knee_vmc_joint
-  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI / 2.;
+  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI_2;
   //  left_angle[1] = left_knee_joint_handle_.getPosition() - M_PI / 4.;
-  left_angle[1] = left_knee_joint_handle_.getPosition() - 1.6581;
-  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI / 2.;
+  //  left_angle[1] = left_knee_joint_handle_.getPosition() - 1.6581;
+  left_angle[1] = left_knee_joint_handle_.getPosition() - M_PI_2;
+  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI_2;
   //  right_angle[1] = right_knee_joint_handle_.getPosition() - M_PI / 4.;
-  right_angle[1] = right_knee_joint_handle_.getPosition() - 1.6581;
+  //  right_angle[1] = right_knee_joint_handle_.getPosition() - 1.6581;
+  right_angle[1] = right_knee_joint_handle_.getPosition() - M_PI_2;
   // [0] is length, [1] is angle
   leg_pos(left_angle[0], left_angle[1], left_pos);
   leg_pos(right_angle[0], right_angle[1], right_pos);
@@ -131,6 +134,7 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
     x_left[2] += x_left[3] * period.toSec();
   else
     x_left[2] = 0.;
+  x_left[2] -= bias_params_->x;
   x_left[0] = left_pos[1] + pitch;
   x_left[1] = -left_spd[1] + angular_vel_base.y;
   x_left[4] = -pitch;
@@ -222,6 +226,23 @@ bool BipedalController::setupLQR(ros::NodeHandle& controller_nh)
     ks.push_back(k);
   }
   polyfit(ks, lengths, coeffs_);
+  return true;
+}
+
+bool BipedalController::setupBiasParams(ros::NodeHandle& controller_nh)
+{
+  const std::pair<const char*, double*> tbl[] = {
+    { "x_bias", &bias_params_->x },
+    { "pitch_bias", &bias_params_->pitch },
+    { "roll_bias", &bias_params_->roll },
+  };
+
+  for (const auto& e : tbl)
+    if (!controller_nh.getParam(e.first, *e.second))
+    {
+      ROS_ERROR("Param %s not given (namespace: %s)", e.first, controller_nh.getNamespace().c_str());
+      return false;
+    }
   return true;
 }
 

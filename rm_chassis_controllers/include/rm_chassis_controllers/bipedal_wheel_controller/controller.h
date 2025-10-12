@@ -54,6 +54,7 @@ private:
   void updateEstimation(const ros::Time& time, const ros::Duration& period);
   bool setupModelParams(ros::NodeHandle& controller_nh);
   bool setupLQR(ros::NodeHandle& controller_nh);
+  bool setupBiasParams(ros::NodeHandle& controller_nh);
   void polyfit(const std::vector<Eigen::Matrix<double, 2, 6>>& Ks, const std::vector<double>& L0s,
                Eigen::Matrix<double, 4, 12>& coeffs);
   geometry_msgs::Twist odometry() override;
@@ -62,6 +63,7 @@ private:
   Eigen::Matrix<double, CONTROL_DIM, CONTROL_DIM> r_{};
 
   std::shared_ptr<ModelParams> model_params_;
+  std::shared_ptr<BiasParams> bias_params_;
 
   int balance_mode_ = BalanceMode::SIT_DOWN;
   bool balance_state_changed_ = false;
