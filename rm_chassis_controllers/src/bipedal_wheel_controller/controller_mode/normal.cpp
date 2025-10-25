@@ -8,12 +8,10 @@
 namespace rm_chassis_controllers
 {
 Normal::Normal(const std::vector<hardware_interface::JointHandle*>& joint_handles,
-               const std::vector<control_toolbox::Pid*>& pid_legs, const control_toolbox::Pid& pid_yaw_pos,
-               const control_toolbox::Pid& pid_yaw_vel, const control_toolbox::Pid& pid_theta_diff,
-               const control_toolbox::Pid& pid_roll)
+               const std::vector<control_toolbox::Pid*>& pid_legs, control_toolbox::Pid* pid_yaw_vel,
+               control_toolbox::Pid* pid_theta_diff, control_toolbox::Pid* pid_roll)
   : joint_handles_(joint_handles)
   , pid_legs_(pid_legs)
-  , pid_yaw_pos_(pid_yaw_pos)
   , pid_yaw_vel_(pid_yaw_vel)
   , pid_theta_diff_(pid_theta_diff)
   , pid_roll_(pid_roll)
@@ -26,8 +24,6 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
   if (!controller->getStateChange())
   {
     ROS_INFO("[balance] Enter NORMAL");
-    yaw_total_ = yaw_total_last_ = 0.;
-    yaw_des_ = yaw_total_;
     x_left_(2) = x_right_(2) = 0;
     controller->setStateChange(true);
   }
@@ -37,9 +33,9 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
   auto vel_cmd_ = controller->getVelCmd();
 
   // PID
-  double T_yaw = pid_yaw_vel_.computeCommand(vel_cmd_.z - angular_vel_base_.z, period);
-  double T_theta_diff = pid_theta_diff_.computeCommand(right_pos_[1] - left_pos_[1], period);
-  double T_roll = pid_roll_.computeCommand(0. - roll_, period);
+  double T_yaw = pid_yaw_vel_->computeCommand(vel_cmd_.z - angular_vel_base_.z, period);
+  double T_theta_diff = pid_theta_diff_->computeCommand(right_pos_[1] - left_pos_[1], period);
+  double T_roll = pid_roll_->computeCommand(0. - roll_, period);
 
   // LQR
   Matrix<double, 4, 12> coeffs_ = controller->getCoeffs();
