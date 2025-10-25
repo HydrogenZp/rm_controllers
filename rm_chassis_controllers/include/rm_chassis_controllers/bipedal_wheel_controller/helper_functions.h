@@ -62,13 +62,24 @@ inline void generateAB(const std::shared_ptr<ModelParams>& model_params, Eigen::
  */
 inline void detectLegState(const Eigen::Matrix<double, STATE_DIM, 1>& x, int& leg_state)
 {
-  if (x[0] > -M_PI / 2 + 0.1 && x[0] < M_PI / 2 - 0.3)
+  if (x[0] > -M_PI / 2 + 0.4 && x[0] < M_PI / 2 - 0.4)
     leg_state = LegState::UNDER;
-  else if (x[0] < -M_PI / 2 + 0.1 && x[0] > -M_PI)
+  else if (x[0] < -M_PI / 2 + 0.4 && x[0] > -M_PI)
     leg_state = LegState::FRONT;
-  else if (x[0] > M_PI / 2 - 0.3 && x[0] < M_PI)
+  else if (x[0] > M_PI / 2 - 0.4 && x[0] < M_PI)
     leg_state = LegState::BEHIND;
-  ROS_INFO("[balance] Leg state: %d", leg_state);
+  switch (leg_state)
+  {
+    case LegState::UNDER:
+      ROS_INFO("[balance] Leg state: UNDER");
+      break;
+    case LegState::FRONT:
+      ROS_INFO("[balance] Leg state: FRONT");
+      break;
+    case LegState::BEHIND:
+      ROS_INFO("[balance] Leg state: BEHIND");
+      break;
+  }
 }
 
 /**
@@ -90,7 +101,7 @@ inline LegCommand computePidLegCommand(double desired_length, double desired_ang
 {
   LegCommand cmd;
   cmd.force = length_pid.computeCommand(desired_length - current_length, period);
-  cmd.torque = -angle_pid.computeCommand(-angles::shortest_angular_distance(desired_angle, current_angle), period);
+  cmd.torque = angle_pid.computeCommand(-angles::shortest_angular_distance(desired_angle, current_angle), period);
   leg_conv(cmd.force, cmd.torque, leg_angle[0], leg_angle[1], cmd.input);
   return cmd;
 }
