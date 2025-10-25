@@ -27,11 +27,11 @@ void Recover::execute(BipedalController* controller, const ros::Time& time, cons
   detectLegState(x_left_, left_leg_state);
   detectLegState(x_right_, right_leg_state);
   if (controller->getOverturn() && left_leg_state != LegState::FRONT)
-    left_cmd = computePidLegCommand(0.4, -M_PI / 2 - 0.8, left_pos_[0], left_pos_[1], *pid_legs_[0], *pid_thetas_[0],
+    left_cmd = computePidLegCommand(0.36, -M_PI / 2 - 0.8, left_pos_[0], left_pos_[1], *pid_legs_[0], *pid_thetas_[0],
                                     left_angle_, period);
   if (controller->getOverturn() && right_leg_state != LegState::FRONT)
-    right_cmd = computePidLegCommand(0.4, -M_PI / 2 - 0.8, right_pos_[0], right_pos_[1], *pid_legs_[1], *pid_thetas_[1],
-                                     right_angle_, period);
+    right_cmd = computePidLegCommand(0.36, -M_PI / 2 - 0.8, right_pos_[0], right_pos_[1], *pid_legs_[1],
+                                     *pid_thetas_[1], right_angle_, period);
   setJointCommands(joint_handles_, left_cmd, right_cmd);
 
   // Exit
