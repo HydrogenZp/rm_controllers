@@ -49,8 +49,22 @@ bool BipedalController::init(hardware_interface::RobotHW* robot_hw, ros::NodeHan
   leg_cmd_sub_ = controller_nh.subscribe<rm_msgs::LegCmd>("/leg_cmd", 1, legCmdCallback);
 
   unstick_pub_ = controller_nh.advertise<std_msgs::Bool>("unstick", 1);
+  legged_chassis_status_pub_ = controller_nh.advertise<rm_msgs::LeggedChassisStatus>("legged_chassis_status", 1);
+  lqr_status_pub_ = controller_nh.advertise<rm_msgs::LeggedLQRStatus>("lqr_status", 1);
+  x_left_.setZero();
+  x_right_.setZero();
 
-  ROS_INFO("chassis_controller init done!");
+  // Slippage detection
+  A_ << 1, 0, 0, 1;
+  H_ << 1, 0, 0, 1;
+  Q_ << 1, 0, 0, 1;
+  R_ << 150, 0, 0, 150;
+  B_.setZero();
+  X_.setZero();
+  U_.setZero();
+  kalmanFilterPtr_ = std::make_shared<KalmanFilter<double>>(A_, B_, H_, Q_, R_);
+  kalmanFilterPtr_->clear(X_);
+
   return true;
 }
 
@@ -110,14 +124,11 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
   // vmc
   double left_angle[2]{}, right_angle[2]{}, left_pos[2]{}, left_spd[2]{}, right_pos[2]{}, right_spd[2]{};
   // [0]:hip_vmc_joint [1]:knee_vmc_joint
-  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI_2;
-  //  left_angle[1] = left_knee_joint_handle_.getPosition() - M_PI / 4.;
-  //  left_angle[1] = left_knee_joint_handle_.getPosition() - 1.6581;
-  left_angle[1] = left_knee_joint_handle_.getPosition() - M_PI_2;
-  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI_2;
-  //  right_angle[1] = right_knee_joint_handle_.getPosition() - M_PI / 4.;
-  //  right_angle[1] = right_knee_joint_handle_.getPosition() - 1.6581;
-  right_angle[1] = right_knee_joint_handle_.getPosition() - M_PI_2;
+  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI;
+  left_angle[1] = left_knee_joint_handle_.getPosition();
+  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI;
+  right_angle[1] = right_knee_joint_handle_.getPosition();
+
   // [0] is length, [1] is angle
   leg_pos(left_angle[0], left_angle[1], left_pos);
   leg_pos(right_angle[0], right_angle[1], right_pos);
@@ -126,24 +137,60 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
   leg_spd(right_hip_joint_handle_.getVelocity(), right_knee_joint_handle_.getVelocity(), right_angle[0], right_angle[1],
           right_spd);
 
-  // update state
-  Eigen::Matrix<double, STATE_DIM, 1> x_left{}, x_right{};
-  x_left[3] =
-      (left_wheel_joint_handle_.getVelocity() + right_wheel_joint_handle_.getVelocity()) / 2.0 * model_params_->r;
-  if (abs(x_left[3]) < 0.4 && vel_cmd_.x == 0.)
-    x_left[2] += x_left[3] * period.toSec();
-  else
-    x_left[2] = 0.;
-  x_left[2] -= bias_params_->x;
-  x_left[0] = left_pos[1] + pitch;
-  x_left[1] = -left_spd[1] + angular_vel_base.y;
-  x_left[4] = -pitch;
-  x_left[5] = -angular_vel_base.y;
-  x_right = x_left;
-  x_right[0] = right_pos[1] + pitch;
-  x_right[1] = -right_spd[1] + angular_vel_base.y;
+  // Slippage_detection
+  leftWheelVel = (left_wheel_joint_handle_.getVelocity() - angular_vel_base.y + left_spd[1]) * wheel_radius_;
+  rightWheelVel = (right_wheel_joint_handle_.getVelocity() + angular_vel_base.y + right_spd[1]) * wheel_radius_;
+  leftWheelVelAbsolute =
+      leftWheelVel + left_pos[0] * left_spd[1] * cos(left_pos[1] + pitch_) + left_spd[0] * sin(left_pos[1] + pitch_);
+  rightWheelVelAbsolute = rightWheelVel + right_pos[0] * right_spd[1] * cos(right_pos[1] + pitch_) +
+                          right_spd[0] * sin(right_pos[1] + pitch_);
 
-  mode_manager_->getModeImpl()->updateEstimation(x_left, x_right);
+  double wheel_vel_aver = (leftWheelVelAbsolute + rightWheelVelAbsolute) / 2.;
+  if (i >= sample_times_)
+  {  // oversampling
+    i = 0;
+    X_(0) = wheel_vel_aver;
+    X_(1) = linear_acc_base.x;
+    kalmanFilterPtr_->predict(U_);
+    kalmanFilterPtr_->update(X_);
+  }
+  else
+  {
+    kalmanFilterPtr_->predict(U_);
+    i++;
+  }
+  auto x_hat_vel = kalmanFilterPtr_->getState();
+
+  // update state
+  x_left_[3] = x_hat_vel(0);
+  if (abs(x_left_[3]) < 0.3 && vel_cmd_.x == 0.0)
+    x_left_[2] += x_left_[3] * period.toSec();
+  else
+    x_left_[2] = 0.;
+  x_left_[2] -= bias_params_->x;
+  x_left_[0] = (left_pos[1] + pitch);
+  x_left_[1] = left_spd[1] + angular_vel_base.y;
+  x_left_[4] = -pitch;
+  x_left_[5] = -angular_vel_base.y;
+  x_right_ = x_left_;
+  x_right_[0] = (right_pos[1] + pitch);
+  x_right_[1] = right_spd[1] + angular_vel_base.y;
+
+  legged_chassis_status_msg.roll = roll;
+  legged_chassis_status_msg.pitch = x_left_[4];
+  legged_chassis_status_msg.d_pitch = x_left_[5];
+  legged_chassis_status_msg.yaw = yaw;
+  legged_chassis_status_msg.d_yaw = angular_vel_base.z;
+  legged_chassis_status_msg.left_leg_length = left_pos[0];
+  legged_chassis_status_msg.right_leg_length = right_pos[0];
+  legged_chassis_status_msg.x = x_left_[2];
+  legged_chassis_status_msg.x_dot = x_left_[3];
+  legged_chassis_status_msg.left_leg_theta = x_left_[0];
+  legged_chassis_status_msg.left_leg_theta_dot = x_left_[1];
+  legged_chassis_status_msg.right_leg_theta = x_right_[0];
+  legged_chassis_status_msg.right_leg_theta_dot = x_right_[1];
+
+  mode_manager_->getModeImpl()->updateEstimation(x_left_, x_right_);
   mode_manager_->getModeImpl()->updateLegKinematics(left_angle, right_angle, left_pos, left_spd, right_pos, right_spd);
   mode_manager_->getModeImpl()->updateBaseState(angular_vel_base, linear_acc_base, roll, pitch, yaw);
 }
@@ -153,6 +200,7 @@ void BipedalController::pubState()
   std_msgs::Bool msg;
   msg.data = mode_manager_->getModeImpl()->getUnstick();
   unstick_pub_.publish(msg);
+  legged_chassis_status_pub_.publish(legged_chassis_status_msg);
 }
 
 void BipedalController::stopping(const ros::Time& time)
@@ -209,7 +257,7 @@ bool BipedalController::setupLQR(ros::NodeHandle& controller_nh)
   // Continuous model \dot{x} = A x + B u
   std::vector<double> lengths;
   std::vector<Eigen::Matrix<double, CONTROL_DIM, STATE_DIM>> ks;
-  for (int i = 5; i < 30; i++)
+  for (int i = 10; i < 40; i++)
   {
     double length = i / 100.;
     lengths.push_back(length);
@@ -274,6 +322,25 @@ geometry_msgs::Twist BipedalController::odometry()
     twist.angular.z = 0;
   }
   return twist;
+}
+
+void BipedalController::pubLQRStatus(Eigen::Matrix<double, STATE_DIM, 1> left_error,
+                                     Eigen::Matrix<double, STATE_DIM, 1> right_error,
+                                     Eigen::Matrix<double, CONTROL_DIM, 1> u_left,
+                                     Eigen::Matrix<double, CONTROL_DIM, 1> u_right) const
+{
+  rm_msgs::LeggedLQRStatus msg;
+  for (int i = 0; i < 6; ++i)
+  {
+    msg.left_leg_error.push_back(left_error(i));
+    msg.right_leg_error.push_back(right_error(i));
+  }
+  for (int i = 0; i < 2; ++i)
+  {
+    msg.left_leg_u.push_back(u_left(i));
+    msg.right_leg_u.push_back(u_right(i));
+  }
+  lqr_status_pub_.publish(msg);
 }
 
 }  // namespace rm_chassis_controllers

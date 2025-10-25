@@ -5,7 +5,11 @@
 #pragma once
 
 #include <rm_common/lqr.h>
-#include "rm_msgs/LegCmd.h"
+#include <rm_msgs/LegCmd.h>
+#include <rm_msgs/LeggedChassisStatus.h>
+#include <rm_msgs/LeggedLQRStatus.h>
+#include <rm_msgs/LQRkMatrix.h>
+#include <rm_common/filters/kalman_filter.h>
 #include <control_toolbox/pid.h>
 #include <controller_interface/multi_interface_controller.h>
 #include <geometry_msgs/TwistStamped.h>
@@ -41,6 +45,7 @@ public:
   const std::shared_ptr<ModelParams>& getModelParams(){ return model_params_; }
   double getLegCmd() const{ return legCmd_; }
   double getJumpCmd() const{ return jumpCmd_; }
+  int getBaseState() const{ return state_; }
   geometry_msgs::Vector3 getVelCmd(){ return vel_cmd_; }
 
   void setStateChange(bool state){ balance_state_changed_ = state; }
@@ -48,6 +53,8 @@ public:
   void setJumpCmd(bool cmd){ jumpCmd_ = cmd; }
   void setMode(int mode){ balance_mode_ = mode; }
   void pubState();
+  void pubLQRStatus(Eigen::Matrix<double, STATE_DIM, 1> left_error, Eigen::Matrix<double, STATE_DIM, 1> right_error,
+                    Eigen::Matrix<double, CONTROL_DIM, 1> u_left, Eigen::Matrix<double, CONTROL_DIM, 1> u_right) const;
   // clang-format on
 
 private:
@@ -69,6 +76,15 @@ private:
   bool balance_state_changed_ = false;
   std::unique_ptr<ModeManager> mode_manager_;
 
+  // Slippage_detection
+  double leftWheelVel{}, rightWheelVel{}, leftWheelVelAbsolute{}, rightWheelVelAbsolute{};
+  int i = 0, sample_times_ = 3;
+  Eigen::Matrix<double, 2, 2> A_, B_, H_, Q_, R_;
+  Eigen::Matrix<double, 2, 1> X_, U_;
+  std::shared_ptr<KalmanFilter<double>> kalmanFilterPtr_;
+
+  Eigen::Matrix<double, STATE_DIM, 1> x_left_{}, x_right_{};
+
   // stand up
   bool complete_stand_ = false, overturn_ = false;
 
@@ -79,12 +95,17 @@ private:
   std::vector<hardware_interface::JointHandle*> joint_handles_;
 
   // Leg Cmd
-  double legCmd_{};
-  bool jumpCmd_{};
+  double legCmd_{ 0.2 };
+  bool jumpCmd_{ false };
+
+  // ros msg
+  rm_msgs::LeggedChassisStatus legged_chassis_status_msg;
 
   // ROS Interface
   ros::Subscriber leg_cmd_sub_;
   ros::Publisher unstick_pub_;
+  ros::Publisher legged_chassis_status_pub_;
+  ros::Publisher lqr_status_pub_;
   ros::Time cmd_update_time_;
 };
 }  // namespace rm_chassis_controllers
