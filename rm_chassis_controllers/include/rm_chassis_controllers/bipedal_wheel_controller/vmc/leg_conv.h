@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 /* Function Declarations */
-extern void leg_conv(double F, double Tp, double phi1, double phi2, double T[2]);
+extern void leg_conv(double F, double Tp, double phi1, double phi4, double T[2]);
 
 #ifdef __cplusplus
 }

@@ -11,6 +11,7 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <unsupported/Eigen/MatrixFunctions>
 
+#include "bipedal_wheel_controller/vmc/leg_params.h"
 #include "bipedal_wheel_controller/vmc/leg_conv.h"
 #include "bipedal_wheel_controller/vmc/leg_spd.h"
 #include "bipedal_wheel_controller/vmc/leg_pos.h"
@@ -57,8 +58,10 @@ bool BipedalController::init(hardware_interface::RobotHW* robot_hw, ros::NodeHan
   // Slippage detection
   A_ << 1, 0, 0, 1;
   H_ << 1, 0, 0, 1;
-  Q_ << 1, 0, 0, 1;
-  R_ << 150, 0, 0, 150;
+  Q_ << 25, 0, 0, 2000;
+  R_ << 800, 0, 0, 0.01;
+  R_wheel_ = R_(0, 0);
+  slip_R_wheel_ = slip_alpha_ * R_wheel_;
   B_.setZero();
   X_.setZero();
   U_.setZero();
@@ -75,6 +78,11 @@ void BipedalController::moveJoint(const ros::Time& time, const ros::Duration& pe
   updateEstimation(time, period);
   mode_manager_->getModeImpl()->execute(this, time, period);
   pubState();
+}
+
+void BipedalController::clearStatus()
+{
+  x_left_(2) = x_right_(2) = 0;
 }
 
 void BipedalController::updateEstimation(const ros::Time& time, const ros::Duration& period)
@@ -112,7 +120,8 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
 
     tf2::Vector3 z_body(0, 0, 1);
     tf2::Vector3 z_world = tf2::quatRotate(odom2base.getRotation(), z_body);
-    overturn_ = z_world.z() < 0;
+    overturn_ = z_world.z() < -5.0;
+    overturn_ = false;
   }
   catch (tf2::TransformException& ex)
   {
@@ -124,10 +133,16 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
   // vmc
   double left_angle[2]{}, right_angle[2]{}, left_pos[2]{}, left_spd[2]{}, right_pos[2]{}, right_spd[2]{};
   // [0]:hip_vmc_joint [1]:knee_vmc_joint
-  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI;
-  left_angle[1] = left_knee_joint_handle_.getPosition();
-  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI;
-  right_angle[1] = right_knee_joint_handle_.getPosition();
+  //  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI;
+  //  left_angle[1] = left_knee_joint_handle_.getPosition();
+  //  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI;
+  //  right_angle[1] = right_knee_joint_handle_.getPosition();
+
+  // gazebo
+  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI_2;
+  left_angle[1] = left_knee_joint_handle_.getPosition() - M_PI_2;
+  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI_2;
+  right_angle[1] = right_knee_joint_handle_.getPosition() - M_PI_2;
 
   // [0] is length, [1] is angle
   leg_pos(left_angle[0], left_angle[1], left_pos);
@@ -146,27 +161,35 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
                           right_spd[0] * sin(right_pos[1] + pitch_);
 
   double wheel_vel_aver = (leftWheelVelAbsolute + rightWheelVelAbsolute) / 2.;
+  R_(0, 0) = slip_flag_ ? slip_R_wheel_ : R_wheel_;
   if (i >= sample_times_)
   {  // oversampling
     i = 0;
     X_(0) = wheel_vel_aver;
     X_(1) = linear_acc_base.x;
-    kalmanFilterPtr_->predict(U_);
+    kalmanFilterPtr_->predict(U_, R_);
     kalmanFilterPtr_->update(X_);
   }
   else
   {
-    kalmanFilterPtr_->predict(U_);
+    kalmanFilterPtr_->predict(U_, R_);
     i++;
   }
   auto x_hat_vel = kalmanFilterPtr_->getState();
+  slip_flag_ = abs(x_hat_vel(0) - wheel_vel_aver) > 0.5;
 
   // update state
+  //  x_left_[3] = state_ != RAW ? x_hat_vel(0) : 0;
+  //  x_left_[2] += state_ != RAW ? x_left_[3] * period.toSec() : 0;
   x_left_[3] = x_hat_vel(0);
-  if (abs(x_left_[3]) < 0.3 && vel_cmd_.x == 0.0)
-    x_left_[2] += x_left_[3] * period.toSec();
-  else
-    x_left_[2] = 0.;
+  x_left_[2] += x_left_[3] * period.toSec();
+  //  if (abs(x_left_[3]) <= 0.8f && abs(vel_cmd_.x) <= 0.1f)
+  //  {
+  //  }
+  //  else
+  //  {
+  //    x_left_[2] = 0;
+  //  }
   x_left_[2] -= bias_params_->x;
   x_left_[0] = (left_pos[1] + pitch);
   x_left_[1] = left_spd[1] + angular_vel_base.y;
@@ -176,7 +199,10 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
   x_right_[0] = (right_pos[1] + pitch);
   x_right_[1] = right_spd[1] + angular_vel_base.y;
 
-  legged_chassis_status_msg.roll = roll;
+  // ros msg
+  rm_msgs::LeggedChassisStatus legged_chassis_status_msg;
+  legged_chassis_status_msg.roll =
+      (left_wheel_joint_handle_.getVelocity() + right_wheel_joint_handle_.getVelocity()) * model_params_->r / 2.0;
   legged_chassis_status_msg.pitch = x_left_[4];
   legged_chassis_status_msg.d_pitch = x_left_[5];
   legged_chassis_status_msg.yaw = yaw;
@@ -189,6 +215,10 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
   legged_chassis_status_msg.left_leg_theta_dot = x_left_[1];
   legged_chassis_status_msg.right_leg_theta = x_right_[0];
   legged_chassis_status_msg.right_leg_theta_dot = x_right_[1];
+  legged_chassis_status_msg.linear_acc_base.push_back(linear_acc_base.x);
+  legged_chassis_status_msg.linear_acc_base.push_back(linear_acc_base.y);
+  legged_chassis_status_msg.linear_acc_base.push_back(linear_acc_base.z);
+  legged_chassis_status_pub_.publish(legged_chassis_status_msg);
 
   mode_manager_->getModeImpl()->updateEstimation(x_left_, x_right_);
   mode_manager_->getModeImpl()->updateLegKinematics(left_angle, right_angle, left_pos, left_spd, right_pos, right_spd);
@@ -200,7 +230,6 @@ void BipedalController::pubState()
   std_msgs::Bool msg;
   msg.data = mode_manager_->getModeImpl()->getUnstick();
   unstick_pub_.publish(msg);
-  legged_chassis_status_pub_.publish(legged_chassis_status_msg);
 }
 
 void BipedalController::stopping(const ros::Time& time)
@@ -214,18 +243,18 @@ void BipedalController::stopping(const ros::Time& time)
 
 bool BipedalController::setupModelParams(ros::NodeHandle& controller_nh)
 {
-  const std::pair<const char*, double*> tbl[] =  //
-      { { "m_w", &model_params_->m_w },
-        { "m_p", &model_params_->m_p },
-        { "M", &model_params_->M },
-        { "i_w", &model_params_->i_w },
-        { "i_m", &model_params_->i_m },
-        { "i_p", &model_params_->i_p },
-        { "l", &model_params_->l },
-        { "L_weight", &model_params_->L_weight },
-        { "Lm_weight", &model_params_->Lm_weight },
-        { "g", &model_params_->g },
-        { "wheel_radius", &model_params_->r } };
+  const std::pair<const char*, double*> tbl[] = { { "m_w", &model_params_->m_w },
+                                                  { "m_p", &model_params_->m_p },
+                                                  { "M", &model_params_->M },
+                                                  { "i_w", &model_params_->i_w },
+                                                  { "i_m", &model_params_->i_m },
+                                                  { "i_p", &model_params_->i_p },
+                                                  { "l", &model_params_->l },
+                                                  { "L_weight", &model_params_->L_weight },
+                                                  { "Lm_weight", &model_params_->Lm_weight },
+                                                  { "g", &model_params_->g },
+                                                  { "wheel_radius", &model_params_->r },
+                                                  { "spring_force", &model_params_->f_spring } };
 
   for (const auto& e : tbl)
     if (!controller_nh.getParam(e.first, *e.second))
@@ -233,6 +262,13 @@ bool BipedalController::setupModelParams(ros::NodeHandle& controller_nh)
       ROS_ERROR("Param %s not given (namespace: %s)", e.first, controller_nh.getNamespace().c_str());
       return false;
     }
+
+  if (!controller_nh.getParam("default_leg_length", default_leg_length_))
+  {
+    ROS_ERROR("Param %s not given (namespace: %s)", "default_leg_length", controller_nh.getNamespace().c_str());
+    return false;
+  }
+
   return true;
 }
 
@@ -326,19 +362,26 @@ geometry_msgs::Twist BipedalController::odometry()
 
 void BipedalController::pubLQRStatus(Eigen::Matrix<double, STATE_DIM, 1> left_error,
                                      Eigen::Matrix<double, STATE_DIM, 1> right_error,
+                                     Eigen::Matrix<double, STATE_DIM, 1> left_ref,
+                                     Eigen::Matrix<double, STATE_DIM, 1> right_ref,
                                      Eigen::Matrix<double, CONTROL_DIM, 1> u_left,
-                                     Eigen::Matrix<double, CONTROL_DIM, 1> u_right) const
+                                     Eigen::Matrix<double, CONTROL_DIM, 1> u_right,
+                                     Eigen::Matrix<double, CONTROL_DIM, 1> F_leg_, const bool unstick[2]) const
 {
   rm_msgs::LeggedLQRStatus msg;
   for (int i = 0; i < 6; ++i)
   {
     msg.left_leg_error.push_back(left_error(i));
     msg.right_leg_error.push_back(right_error(i));
+    msg.left_leg_ref.push_back(left_ref(i));
+    msg.right_leg_ref.push_back(right_ref(i));
   }
   for (int i = 0; i < 2; ++i)
   {
     msg.left_leg_u.push_back(u_left(i));
     msg.right_leg_u.push_back(u_right(i));
+    msg.F_leg.push_back(F_leg_[i]);
+    msg.unstick.push_back(unstick[i]);
   }
   lqr_status_pub_.publish(msg);
 }

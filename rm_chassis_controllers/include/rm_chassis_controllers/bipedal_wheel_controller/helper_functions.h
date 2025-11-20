@@ -15,7 +15,6 @@
 
 #include "bipedal_wheel_controller/dynamics/gen_A.h"
 #include "bipedal_wheel_controller/dynamics/gen_B.h"
-#include "bipedal_wheel_controller/vmc/leg_conv_fwd.h"
 #include "bipedal_wheel_controller/vmc/leg_conv.h"
 #include "bipedal_wheel_controller/definitions.h"
 
@@ -62,22 +61,22 @@ inline void generateAB(const std::shared_ptr<ModelParams>& model_params, Eigen::
  */
 inline void detectLegState(const Eigen::Matrix<double, STATE_DIM, 1>& x, int& leg_state)
 {
-  if (x[0] > -M_PI / 2 + 0.4 && x[0] < M_PI / 2 - 0.4)
+  if (x[0] > -M_PI / 2 + 0.7 && x[0] < M_PI / 2 - 0.7)
     leg_state = LegState::UNDER;
-  else if (x[0] < -M_PI / 2 + 0.4 && x[0] > -M_PI)
+  else if (x[0] < -M_PI / 2 + 0.7 && x[0] > -M_PI)
     leg_state = LegState::FRONT;
-  else if (x[0] > M_PI / 2 - 0.4 && x[0] < M_PI)
+  else if (x[0] > M_PI / 2 - 0.7 && x[0] < M_PI)
     leg_state = LegState::BEHIND;
   switch (leg_state)
   {
     case LegState::UNDER:
-      ROS_INFO("[balance] Leg state: UNDER");
+      ROS_INFO("[balance] x[0]: %.3f Leg state: UNDER", x[0]);
       break;
     case LegState::FRONT:
-      ROS_INFO("[balance] Leg state: FRONT");
+      ROS_INFO("[balance] x[0]: %.3f Leg state: FRONT", x[0]);
       break;
     case LegState::BEHIND:
-      ROS_INFO("[balance] Leg state: BEHIND");
+      ROS_INFO("[balance] x[0]: %.3f Leg state: BEHIND", x[0]);
       break;
   }
 }
@@ -94,14 +93,18 @@ inline void detectLegState(const Eigen::Matrix<double, STATE_DIM, 1>& x, int& le
  * @param period
  * @return
  */
-inline LegCommand computePidLegCommand(double desired_length, double desired_angle, double current_length,
-                                       double current_angle, control_toolbox::Pid& length_pid,
-                                       control_toolbox::Pid& angle_pid, const double* leg_angle,
-                                       const ros::Duration& period)
+inline LegCommand computePidLegCommand(double desired_length, double desired_angle, double leg_pos[2],
+                                       double leg_spd[2], control_toolbox::Pid& length_pid,
+                                       control_toolbox::Pid& angle_pid, control_toolbox::Pid& angle_vel_pid,
+                                       const double* leg_angle, const int& leg_state, const ros::Duration& period,
+                                       double feedforward_force = 0.0f, const bool& overturn = false)
 {
-  LegCommand cmd;
-  cmd.force = length_pid.computeCommand(desired_length - current_length, period);
-  cmd.torque = angle_pid.computeCommand(-angles::shortest_angular_distance(desired_angle, current_angle), period);
+  LegCommand cmd{ 0.0, 0.0, { 0.0, 0.0 } };
+  cmd.force = length_pid.computeCommand(desired_length - leg_pos[0], period) + feedforward_force;
+  if (leg_state == LegState::BEHIND && !overturn)
+    cmd.torque = angle_pid.computeCommand(-angles::shortest_angular_distance(desired_angle, leg_pos[1]), period);
+  else
+    cmd.torque = angle_vel_pid.computeCommand(-3.5 - leg_spd[1], period);
   leg_conv(cmd.force, cmd.torque, leg_angle[0], leg_angle[1], cmd.input);
   return cmd;
 }

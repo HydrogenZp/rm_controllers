@@ -46,16 +46,21 @@ public:
   double getLegCmd() const{ return legCmd_; }
   double getJumpCmd() const{ return jumpCmd_; }
   int getBaseState() const{ return state_; }
+  inline double getDefaultLegLength() const { return default_leg_length_;}
   geometry_msgs::Vector3 getVelCmd(){ return vel_cmd_; }
-
+  bool getMoveFlag() const{ return move_flag_; }
+  void setMoveFlag(const bool& move_flag) { move_flag_ = move_flag; }
   void setStateChange(bool state){ balance_state_changed_ = state; }
   void setCompleteStand(bool state){ complete_stand_ = state; }
   void setJumpCmd(bool cmd){ jumpCmd_ = cmd; }
   void setMode(int mode){ balance_mode_ = mode; }
   void pubState();
   void pubLQRStatus(Eigen::Matrix<double, STATE_DIM, 1> left_error, Eigen::Matrix<double, STATE_DIM, 1> right_error,
-                    Eigen::Matrix<double, CONTROL_DIM, 1> u_left, Eigen::Matrix<double, CONTROL_DIM, 1> u_right) const;
+                    Eigen::Matrix<double, STATE_DIM, 1> left_ref, Eigen::Matrix<double, STATE_DIM, 1> right_ref,
+                    Eigen::Matrix<double, CONTROL_DIM, 1> u_left, Eigen::Matrix<double, CONTROL_DIM, 1> u_right,
+                    Eigen::Matrix<double, CONTROL_DIM, 1> F_leg_, const bool unstick[2]) const;
   // clang-format on
+  void clearStatus();
 
 private:
   void updateEstimation(const ros::Time& time, const ros::Duration& period);
@@ -77,14 +82,17 @@ private:
   std::unique_ptr<ModeManager> mode_manager_;
 
   // Slippage_detection
-  double leftWheelVel{}, rightWheelVel{}, leftWheelVelAbsolute{}, rightWheelVelAbsolute{};
+  double leftWheelVel{}, rightWheelVel{}, leftWheelVelAbsolute{}, rightWheelVelAbsolute{}, slip_alpha_{ 2.0 },
+      slip_R_wheel_{}, R_wheel_{};
   int i = 0, sample_times_ = 3;
+  bool slip_flag_{ false };
   Eigen::Matrix<double, 2, 2> A_, B_, H_, Q_, R_;
   Eigen::Matrix<double, 2, 1> X_, U_;
   std::shared_ptr<KalmanFilter<double>> kalmanFilterPtr_;
 
   Eigen::Matrix<double, STATE_DIM, 1> x_left_{}, x_right_{};
-
+  double default_leg_length_{ 0.18 };
+  bool move_flag_{ false };
   // stand up
   bool complete_stand_ = false, overturn_ = false;
 
@@ -97,9 +105,6 @@ private:
   // Leg Cmd
   double legCmd_{ 0.2 };
   bool jumpCmd_{ false };
-
-  // ros msg
-  rm_msgs::LeggedChassisStatus legged_chassis_status_msg;
 
   // ROS Interface
   ros::Subscriber leg_cmd_sub_;

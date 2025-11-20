@@ -24,25 +24,26 @@ void StandUp::execute(BipedalController* controller, const ros::Time& time, cons
     controller->setCompleteStand(false);
     detectLegState(x_left_, left_leg_state);
     detectLegState(x_right_, right_leg_state);
-    ROS_INFO("x_left[0]: %f, x_left[1]: %f, x_left[2]: %f, x_left[3]: %f, x_left[4]: %f, x_left[5]: %f\n", x_left_[0],
-             x_left_[1], x_left_[2], x_left_[3], x_left_[4], x_left_[5]);
   }
 
+  auto model_params_ = controller->getModelParams();
+  double spring_force = -model_params_->f_spring;
   double theta_des_l, theta_des_r, length_des_l, length_des_r;
   LegCommand left_cmd = { 0, 0, { 0., 0. } }, right_cmd = { 0, 0, { 0., 0. } };
   setUpLegMotion(x_left_, right_leg_state, left_pos_[0], left_pos_[1], left_leg_state, theta_des_l, length_des_l);
   setUpLegMotion(x_right_, left_leg_state, right_pos_[0], right_pos_[1], right_leg_state, theta_des_r, length_des_r);
-  left_cmd = computePidLegCommand(length_des_l, theta_des_l, left_pos_[0], left_pos_[1], *pid_legs_[0], *pid_thetas_[0],
-                                  left_angle_, period);
-  right_cmd = computePidLegCommand(length_des_r, theta_des_r, right_pos_[0], right_pos_[1], *pid_legs_[1],
-                                   *pid_thetas_[1], right_angle_, period);
+  left_cmd = computePidLegCommand(length_des_l, theta_des_l, left_pos_, left_spd_, *pid_legs_[0], *pid_thetas_[0],
+                                  *pid_thetas_[2], left_angle_, left_leg_state, period, spring_force);
+  right_cmd = computePidLegCommand(length_des_r, theta_des_r, right_pos_, right_spd_, *pid_legs_[1], *pid_thetas_[1],
+                                   *pid_thetas_[3], right_angle_, right_leg_state, period, spring_force);
+
   setJointCommands(joint_handles_, left_cmd, right_cmd);
 
   // Exit
-  if (((left_pos_[1] < 0.39 && left_leg_state == LegState::BEHIND) ||
-       (left_pos_[1] > 0. && left_leg_state == LegState::UNDER)) &&
-      ((right_pos_[1] < 0.39 && right_leg_state == LegState::BEHIND) ||
-       (right_pos_[1] > 0. && right_leg_state == LegState::UNDER)))
+  if (((left_pos_[1] < 0.3 && left_leg_state == LegState::BEHIND) ||
+       (left_pos_[1] > -0.4 && left_leg_state == LegState::UNDER)) &&
+      ((right_pos_[1] < 0.3 && right_leg_state == LegState::BEHIND) ||
+       (right_pos_[1] > -0.4 && right_leg_state == LegState::UNDER)))
   {
     controller->setMode(BalanceMode::NORMAL);
     controller->setStateChange(false);
@@ -57,13 +58,17 @@ void StandUp::setUpLegMotion(const Eigen::Matrix<double, STATE_DIM, 1>& x, const
   switch (leg_state)
   {
     case LegState::UNDER:
-      theta_des = 0.15;
-      length_des = 0.2;
+      theta_des = M_PI / 2 - 0.3;
+      length_des = 0.36;
+      if (leg_length > 0.35)
+      {
+        leg_state = LegState::FRONT;
+      }
       break;
     case LegState::FRONT:
-      theta_des = M_PI / 2 + 0.2;
+      theta_des = M_PI / 2 - 0.3;
       length_des = 0.36;
-      if (abs(angles::shortest_angular_distance(x[0], M_PI / 2)) < 0.2 && abs(x[4]) < 0.1)
+      if (abs(x[0] - theta_des) < 0.1 && abs(x[4]) < 0.2)
         leg_state = LegState::BEHIND;
       break;
     case LegState::BEHIND:
@@ -71,8 +76,11 @@ void StandUp::setUpLegMotion(const Eigen::Matrix<double, STATE_DIM, 1>& x, const
       length_des = leg_length;
       if (other_leg_state != LegState::FRONT)
       {
-        theta_des = 0.;
-        length_des = 0.2;
+        length_des = 0.18;
+      }
+      if (leg_length < 0.20)
+      {
+        theta_des = 0;
       }
       break;
   }

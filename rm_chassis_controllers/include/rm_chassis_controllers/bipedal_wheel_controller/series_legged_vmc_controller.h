@@ -13,6 +13,7 @@
 #include <rm_common/ros_utilities.h>
 #include <std_msgs/Float64MultiArray.h>
 
+#include "bipedal_wheel_controller/vmc/leg_params.h"
 #include "bipedal_wheel_controller/vmc/leg_conv.h"
 #include "bipedal_wheel_controller/vmc/leg_pos.h"
 #include "bipedal_wheel_controller/vmc/leg_spd.h"
@@ -44,7 +45,7 @@ private:
   hardware_interface::JointHandle jointThigh_, jointKnee_;
   control_toolbox::Pid pidLength_, pidAngle_;
 
-  double vmcBiasAngle_;
+  double vmcBiasAngle_, spring_force_;
   double lengthCmd_, angleCmd_;
 
   ros::Publisher statePublisher_, jointCmdStatePublisher_;

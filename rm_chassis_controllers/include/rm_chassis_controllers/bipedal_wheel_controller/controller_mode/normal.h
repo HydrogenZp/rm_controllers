@@ -27,17 +27,17 @@ public:
   }
 
 private:
-  double calculateSupportForce(double F, double Tp, double leg_length, double acc_z,
-                               Eigen::Matrix<double, STATE_DIM, 1> x, Eigen::Matrix<double, CONTROL_DIM, 1> u,
-                               const std::shared_ptr<ModelParams>& model_params);
-  bool unstickDetection(const double& hip_effort, const double& knee_effort, const double& wheel_effort,
-                        const double& hip_angle, const double& knee_angle, const double& leg_length,
+  double calculateSupportForce(double F, double Tp, double leg_length, const double& leg_len_spd, double acc_z,
+                               Eigen::Matrix<double, STATE_DIM, 1> x, const std::shared_ptr<ModelParams>& model_params,
+                               const ros::Duration& period);
+  bool unstickDetection(const double& F_leg, const double& Tp, const double& leg_len_spd, const double& leg_length,
                         const double& acc_z, const std::shared_ptr<ModelParams>& model_params,
-                        Eigen::Matrix<double, STATE_DIM, 1> x);
+                        Eigen::Matrix<double, STATE_DIM, 1> x, const ros::Duration& period);
   std::vector<hardware_interface::JointHandle*> joint_handles_;
   std::vector<control_toolbox::Pid*> pid_legs_;
   control_toolbox::Pid *pid_yaw_vel_, *pid_theta_diff_, *pid_roll_;
 
+  double pos_des_{ 0.0 }, leg_length_des{ 0.18 };
   int jump_phase_ = JumpPhase::SQUAT;
   bool start_jump_ = false;
   std::unique_ptr<MovingAverageFilter<double>> supportForceAveragePtr;

@@ -22,6 +22,7 @@ struct ModelParams
   double i_m;        // Body inertia
   double r;          // Wheel radius
   double g;          // Gravity acceleration
+  double f_spring;   // Spring Force
 };
 
 struct BiasParams
@@ -58,11 +59,12 @@ enum BalanceMode
   NORMAL,
   STAND_UP,
   SIT_DOWN,
-  RECOVER
+  RECOVER,
+  UPSTAIRS,
 };
 
 constexpr std::array<std::pair<JumpPhase, const double>, 3> jumpLengthDes = {
-  { { JumpPhase::SQUAT, 0.15 }, { JumpPhase::JUMP, 0.32 }, { JumpPhase::SHRINK, 0.15 } }
+  { { JumpPhase::SQUAT, 0.15 }, { JumpPhase::JUMP, 0.38 }, { JumpPhase::SHRINK, 0.15 } }
 };
 
 constexpr static const int STATE_DIM = 6;

@@ -17,7 +17,8 @@ extern "C" {
 #endif
 
 /* Function Declarations */
-extern void leg_spd(double dphi1, double dphi2, double phi1, double phi2, double spd[2]);
+extern void CalcJacobian(double phi1, double phi4, double J_[2][2]);
+extern void leg_spd(double dphi1, double dphi4, double phi1, double phi4, double spd[2]);
 
 #ifdef __cplusplus
 }

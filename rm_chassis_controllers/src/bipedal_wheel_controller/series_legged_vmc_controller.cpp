@@ -44,6 +44,11 @@ bool VMCController::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle&
     ROS_ERROR("Load param fail, check the resist of thigh_joint or knee_joint");
     return false;
   }
+  if (!controller_nh.getParam("spring_force", spring_force_))
+  {
+    ROS_ERROR("Load param fail, check the resist of spring_force");
+    return false;
+  }
   jointThigh_ = robot_hw->get<hardware_interface::EffortJointInterface>()->getHandle(thighJoint);
   jointKnee_ = robot_hw->get<hardware_interface::EffortJointInterface>()->getHandle(kneeJoint);
   return true;
@@ -52,17 +57,21 @@ bool VMCController::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle&
 void VMCController::starting(const ros::Time& /*time*/)
 {
   angleCmd_ = 0.;
-  lengthCmd_ = 0.18;
+  lengthCmd_ = 0.20;
 }
 
 void VMCController::update(const ros::Time& time, const ros::Duration& period)
 {
   double knee_angle = 0, thigh_angle = 0, position[2], speed[2];
 
-  // [0]:thigh_vmc_joint [1]:knee_vmc_joint
-  thigh_angle = jointThigh_.getPosition() + M_PI_2;
-  //  knee_angle = jointKnee_.getPosition() - 1.6581;
-  knee_angle = jointKnee_.getPosition() - M_PI_2;
+  // series leg vmc
+  // gazebo
+  //  thigh_angle = jointThigh_.getPosition() + M_PI_2;
+  //  knee_angle = jointKnee_.getPosition() - M_PI_2;
+
+  // five link vmc
+  thigh_angle = jointThigh_.getPosition() + M_PI;
+  knee_angle = jointKnee_.getPosition();
   leg_pos(thigh_angle, knee_angle, position);
   leg_spd(jointThigh_.getVelocity(), jointKnee_.getVelocity(), thigh_angle, knee_angle, speed);
 
@@ -76,11 +85,10 @@ void VMCController::update(const ros::Time& time, const ros::Duration& period)
   //  angleCmd_ = angleSinCmd_;
   double angle_error = angles::shortest_angular_distance(position[1], angleCmd_);
 
-  effortCmd[0] = pidLength_.computeCommand(lengthCmd_ - position[0], period);
-  effortCmd[1] = -pidAngle_.computeCommand(angle_error, period);
+  effortCmd[0] = pidLength_.computeCommand(lengthCmd_ - position[0], period) - spring_force_;
+  effortCmd[1] = pidAngle_.computeCommand(angle_error, period);
 
   leg_conv(effortCmd[0], effortCmd[1], thigh_angle, knee_angle, jointCmd);
-
   std_msgs::Float64MultiArray state;
   state.data.push_back(thigh_angle);
   state.data.push_back(knee_angle);
@@ -89,6 +97,8 @@ void VMCController::update(const ros::Time& time, const ros::Duration& period)
   state.data.push_back(speed[0]);
   state.data.push_back(speed[1]);
   state.data.push_back(angle_error);
+  state.data.push_back(effortCmd[0]);
+  state.data.push_back(effortCmd[1]);
   statePublisher_.publish(state);
 
   std_msgs::Float64MultiArray jointCmdState;
