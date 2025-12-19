@@ -58,7 +58,7 @@ void StandUp::setUpLegMotion(const Eigen::Matrix<double, STATE_DIM, 1>& x, const
   switch (leg_state)
   {
     case LegState::UNDER:
-      theta_des = M_PI / 2 - 0.3;
+      theta_des = M_PI / 2 - 0.35;
       length_des = 0.36;
       if (leg_length > 0.35)
       {
@@ -66,19 +66,19 @@ void StandUp::setUpLegMotion(const Eigen::Matrix<double, STATE_DIM, 1>& x, const
       }
       break;
     case LegState::FRONT:
-      theta_des = M_PI / 2 - 0.3;
+      theta_des = M_PI / 2 - 0.35;
       length_des = 0.36;
-      if (abs(x[0] - theta_des) < 0.1 && abs(x[4]) < 0.2)
+      if (abs(x[0] - theta_des) < 0.3 && abs(x[4]) < 0.3)
         leg_state = LegState::BEHIND;
       break;
     case LegState::BEHIND:
       theta_des = leg_theta;
       length_des = leg_length;
-      if (other_leg_state != LegState::FRONT)
+      if (other_leg_state == LegState::BEHIND)
       {
         length_des = 0.18;
       }
-      if (leg_length < 0.20)
+      if (leg_length < 0.2)
       {
         theta_des = 0;
       }

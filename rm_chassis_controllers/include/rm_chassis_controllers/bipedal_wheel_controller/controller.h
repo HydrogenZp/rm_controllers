@@ -9,6 +9,7 @@
 #include <rm_msgs/LeggedChassisStatus.h>
 #include <rm_msgs/LeggedLQRStatus.h>
 #include <rm_msgs/LQRkMatrix.h>
+#include <rm_msgs/LeggedChassisMode.h>
 #include <rm_common/filters/kalman_filter.h>
 #include <control_toolbox/pid.h>
 #include <controller_interface/multi_interface_controller.h>
@@ -42,7 +43,9 @@ public:
   bool getStateChange() const{ return balance_state_changed_; }
   bool getCompleteStand() const{ return complete_stand_; }
   Eigen::Matrix<double, 4, CONTROL_DIM * STATE_DIM> getCoeffs() { return coeffs_; }
-  const std::shared_ptr<ModelParams>& getModelParams(){ return model_params_; }
+  const std::shared_ptr<ModelParams>& getModelParams() const { return model_params_; }
+  const std::shared_ptr<ControlParams>& getControlParams() const { return control_params_; }
+  const std::shared_ptr<BiasParams>& getBiasParams() const { return bias_params_; }
   double getLegCmd() const{ return legCmd_; }
   double getJumpCmd() const{ return jumpCmd_; }
   int getBaseState() const{ return state_; }
@@ -59,6 +62,7 @@ public:
                     Eigen::Matrix<double, STATE_DIM, 1> left_ref, Eigen::Matrix<double, STATE_DIM, 1> right_ref,
                     Eigen::Matrix<double, CONTROL_DIM, 1> u_left, Eigen::Matrix<double, CONTROL_DIM, 1> u_right,
                     Eigen::Matrix<double, CONTROL_DIM, 1> F_leg_, const bool unstick[2]) const;
+  void pubLegLenStatus(const bool& is_high_leg_flag);
   // clang-format on
   void clearStatus();
 
@@ -66,6 +70,7 @@ private:
   void updateEstimation(const ros::Time& time, const ros::Duration& period);
   bool setupModelParams(ros::NodeHandle& controller_nh);
   bool setupLQR(ros::NodeHandle& controller_nh);
+  bool setupControlParams(ros::NodeHandle& controller_nh);
   bool setupBiasParams(ros::NodeHandle& controller_nh);
   void polyfit(const std::vector<Eigen::Matrix<double, 2, 6>>& Ks, const std::vector<double>& L0s,
                Eigen::Matrix<double, 4, 12>& coeffs);
@@ -75,6 +80,7 @@ private:
   Eigen::Matrix<double, CONTROL_DIM, CONTROL_DIM> r_{};
 
   std::shared_ptr<ModelParams> model_params_;
+  std::shared_ptr<ControlParams> control_params_;
   std::shared_ptr<BiasParams> bias_params_;
 
   int balance_mode_ = BalanceMode::SIT_DOWN;
@@ -91,7 +97,7 @@ private:
   std::shared_ptr<KalmanFilter<double>> kalmanFilterPtr_;
 
   Eigen::Matrix<double, STATE_DIM, 1> x_left_{}, x_right_{};
-  double default_leg_length_{ 0.18 };
+  double default_leg_length_{ 0.2 };
   bool move_flag_{ false };
   // stand up
   bool complete_stand_ = false, overturn_ = false;
@@ -108,8 +114,8 @@ private:
 
   // ROS Interface
   ros::Subscriber leg_cmd_sub_;
-  ros::Publisher unstick_pub_;
-  ros::Publisher legged_chassis_status_pub_;
+  ros::Publisher unstick_pub_, leg_len_status_pub_;
+  ros::Publisher legged_chassis_status_pub_, legged_chassis_mode_pub_;
   ros::Publisher lqr_status_pub_;
   ros::Time cmd_update_time_;
 };

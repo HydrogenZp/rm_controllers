@@ -99,6 +99,8 @@ void VMCController::update(const ros::Time& time, const ros::Duration& period)
   state.data.push_back(angle_error);
   state.data.push_back(effortCmd[0]);
   state.data.push_back(effortCmd[1]);
+  state.data.push_back(jointCmd[0]);
+  state.data.push_back(jointCmd[1]);
   statePublisher_.publish(state);
 
   std_msgs::Float64MultiArray jointCmdState;

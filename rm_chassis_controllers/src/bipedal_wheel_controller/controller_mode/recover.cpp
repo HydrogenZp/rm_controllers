@@ -24,14 +24,20 @@ void Recover::execute(BipedalController* controller, const ros::Time& time, cons
 
   int left_leg_state, right_leg_state;
   double left_desired_angle{ left_pos_[1] }, right_desired_angle{ right_pos_[1] };
+  left_desired_angle = left_pos_[1];
+  right_desired_angle = right_pos_[1];
   LegCommand left_cmd = { 0, 0, { 0., 0. } }, right_cmd = { 0, 0, { 0., 0. } };
   detectLegState(x_left_, left_leg_state);
   detectLegState(x_right_, right_leg_state);
-  left_cmd = computePidLegCommand(0.36, left_desired_angle, left_pos_, left_spd_, *pid_legs_[0], *pid_thetas_[0],
-                                  *pid_thetas_[2], left_angle_, left_leg_state, period, 0.0, controller->getOverturn());
-  right_cmd =
-      computePidLegCommand(0.36, right_desired_angle, right_pos_, right_spd_, *pid_legs_[1], *pid_thetas_[1],
-                           *pid_thetas_[3], right_angle_, right_leg_state, period, 0.0, controller->getOverturn());
+  if (controller->getBaseState() != 4)
+  {
+    left_cmd =
+        computePidLegCommand(0.36, left_desired_angle, left_pos_, left_spd_, *pid_legs_[0], *pid_thetas_[0],
+                             *pid_thetas_[2], left_angle_, left_leg_state, period, 0.0, controller->getOverturn());
+    right_cmd =
+        computePidLegCommand(0.36, right_desired_angle, right_pos_, right_spd_, *pid_legs_[1], *pid_thetas_[1],
+                             *pid_thetas_[3], right_angle_, right_leg_state, period, 0.0, controller->getOverturn());
+  }
   setJointCommands(joint_handles_, left_cmd, right_cmd);
 
   // Exit

@@ -23,6 +23,16 @@ struct ModelParams
   double r;          // Wheel radius
   double g;          // Gravity acceleration
   double f_spring;   // Spring Force
+  double f_gravity;  // Gravity Force
+};
+
+struct ControlParams
+{
+  double jumpOverTime_;
+  double p1_;
+  double p2_;
+  double p3_;
+  double p4_;
 };
 
 struct BiasParams
@@ -48,10 +58,10 @@ enum LegState
 
 enum JumpPhase
 {
-  SQUAT,
-  JUMP,
-  SHRINK,
-  DONE
+  LEG_RETRACTION,
+  JUMP_UP,
+  OFF_GROUND,
+  IDLE,
 };
 
 enum BalanceMode
@@ -64,7 +74,7 @@ enum BalanceMode
 };
 
 constexpr std::array<std::pair<JumpPhase, const double>, 3> jumpLengthDes = {
-  { { JumpPhase::SQUAT, 0.15 }, { JumpPhase::JUMP, 0.38 }, { JumpPhase::SHRINK, 0.15 } }
+  { { JumpPhase::LEG_RETRACTION, 0.2 }, { JumpPhase::JUMP_UP, 0.36 }, { JumpPhase::OFF_GROUND, 0.22 } }
 };
 
 constexpr static const int STATE_DIM = 6;

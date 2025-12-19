@@ -32,14 +32,17 @@ private:
                                const ros::Duration& period);
   bool unstickDetection(const double& F_leg, const double& Tp, const double& leg_len_spd, const double& leg_length,
                         const double& acc_z, const std::shared_ptr<ModelParams>& model_params,
-                        Eigen::Matrix<double, STATE_DIM, 1> x, const ros::Duration& period);
+                        Eigen::Matrix<double, STATE_DIM, 1> x,
+                        std::shared_ptr<MovingAverageFilter<double>> supportForceAveragePtr,
+                        const ros::Duration& period);
   std::vector<hardware_interface::JointHandle*> joint_handles_;
   std::vector<control_toolbox::Pid*> pid_legs_;
   control_toolbox::Pid *pid_yaw_vel_, *pid_theta_diff_, *pid_roll_;
 
-  double pos_des_{ 0.0 }, leg_length_des{ 0.18 };
-  int jump_phase_ = JumpPhase::SQUAT;
-  bool start_jump_ = false;
-  std::unique_ptr<MovingAverageFilter<double>> supportForceAveragePtr;
+  ros::Time lastJumpTime_{};
+
+  double pos_des_{ 0.0 }, leg_length_des{ 0.2 };
+  int jump_phase_ = JumpPhase::IDLE, jumpTime_{ 0 };
+  std::shared_ptr<MovingAverageFilter<double>> leftSupportForceAveragePtr_, rightSupportForceAveragePtr_;
 };
 }  // namespace rm_chassis_controllers
