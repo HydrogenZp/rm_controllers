@@ -43,8 +43,8 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
     controller->setMoveFlag(false);
   }
 
-  double friction_circle = abs(x_left_(3) * angular_vel_base_.z);
-  double friction_circle_alpha = friction_circle > 5.0f ? (5.0f / friction_circle) : 1.0f;
+  double friction_circle = x_left_(3) * angular_vel_base_.z;
+  double friction_circle_alpha = abs(friction_circle) > 3.5f ? (3.5f / abs(friction_circle)) : 1.0f;
   // PID
   double T_yaw = pid_yaw_vel_->computeCommand(friction_circle_alpha * vel_cmd_.z - angular_vel_base_.z, period);
   double T_theta_diff = pid_theta_diff_->computeCommand(right_pos_[1] - left_pos_[1], period);
@@ -280,7 +280,7 @@ bool Normal::unstickDetection(const double& F_leg, const double& Tp, const doubl
   static ros::Time judgeTime;
   double Fn = calculateSupportForce(F_leg, Tp, leg_length, leg_len_spd, acc_z, x, model_params, period);
   supportForceAveragePtr->input(Fn);
-  bool unstick_ = supportForceAveragePtr->output() < 15;
+  bool unstick_ = supportForceAveragePtr->output() < 10;
 
   if (unstick_ != last_unstick_)
   {
