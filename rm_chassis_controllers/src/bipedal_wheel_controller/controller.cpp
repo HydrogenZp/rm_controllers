@@ -130,7 +130,7 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
     tf2::Vector3 z_body(0, 0, 1);
     tf2::Vector3 z_world = tf2::quatRotate(odom2base.getRotation(), z_body);
     overturn_ = z_world.z() < -5.0;
-    overturn_ = false;
+    overturn_ = !(abs(pitch) < 0.9);
   }
   catch (tf2::TransformException& ex)
   {
@@ -142,16 +142,16 @@ void BipedalController::updateEstimation(const ros::Time& time, const ros::Durat
   // vmc
   double left_angle[2]{}, right_angle[2]{}, left_pos[2]{}, left_spd[2]{}, right_pos[2]{}, right_spd[2]{};
   // [0]:hip_vmc_joint [1]:knee_vmc_joint
-  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI;
-  left_angle[1] = left_knee_joint_handle_.getPosition();
-  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI;
-  right_angle[1] = right_knee_joint_handle_.getPosition();
+  //  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI;
+  //  left_angle[1] = left_knee_joint_handle_.getPosition();
+  //  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI;
+  //  right_angle[1] = right_knee_joint_handle_.getPosition();
 
   // gazebo
-  //  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI_2;
-  //  left_angle[1] = left_knee_joint_handle_.getPosition() - M_PI_2;
-  //  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI_2;
-  //  right_angle[1] = right_knee_joint_handle_.getPosition() - M_PI_2;
+  left_angle[0] = left_hip_joint_handle_.getPosition() + M_PI_2;
+  left_angle[1] = left_knee_joint_handle_.getPosition() - M_PI_2;
+  right_angle[0] = right_hip_joint_handle_.getPosition() + M_PI_2;
+  right_angle[1] = right_knee_joint_handle_.getPosition() - M_PI_2;
 
   // [0] is length, [1] is angle
   leg_pos(left_angle[0], left_angle[1], left_pos);
