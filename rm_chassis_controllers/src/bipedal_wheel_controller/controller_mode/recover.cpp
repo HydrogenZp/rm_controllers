@@ -43,7 +43,7 @@ void Recover::execute(BipedalController* controller, const ros::Time& time, cons
   setJointCommands(joint_handles_, left_cmd, right_cmd);
 
   // Exit
-  if (!controller->getOverturn() && abs(x_left_[4]) < 0.2 && abs(roll_) < 0.1)
+  if (!controller->getOverturn() && abs(x_left_[5]) < 0.2 && abs(x_left_[1]) < 0.2 && abs(x_right_[1]) < 0.2)
   {
     controller->setMode(BalanceMode::STAND_UP);
     controller->setStateChange(false);
