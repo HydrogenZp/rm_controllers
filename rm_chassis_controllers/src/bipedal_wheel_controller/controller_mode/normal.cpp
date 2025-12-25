@@ -222,9 +222,11 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
              right_cmd = { F_leg[1], u_right[1], { right_T[0], right_T[1] } };
 
   // upstairs
-  if (((x_left[4] < -0.25 && (x_left(0) + x_right(0) / 2.0f) > 0.25) ||
-       (((left_pos_[1] + right_pos_[1]) / 2.0f) > 0.5)) &&
-      controller->getCompleteStand() && abs(vel_cmd_.x) > 1.0 && abs(x_left(3)) > 0.2 &&
+  //  if (((x_left[4] < -0.25 && (x_left(0) + x_right(0) / 2.0f) > 0.25) ||
+  //       (((left_pos_[1] + right_pos_[1]) / 2.0f) > 0.5)) &&
+  //      controller->getCompleteStand() && abs(vel_cmd_.x) > 1.0 && abs(x_left(3)) > 0.2 &&
+  //      ((left_pos_[0] + right_pos_[0]) / 2.0f) > 0.34)
+  if (linear_acc_base_.z < -3.0 && controller->getCompleteStand() && abs(vel_cmd_.x) > 1.0 && abs(x_left(3)) > 0.2 &&
       ((left_pos_[0] + right_pos_[0]) / 2.0f) > 0.34)
   {
     leg_length_des = controller->getDefaultLegLength();
