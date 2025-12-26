@@ -238,7 +238,7 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
   }
 
   // Protection
-  if ((controller->getCompleteStand() && (abs(x_left(4)) > 0.95 || abs(x_left(0)) > 0.8)) ||
+  if ((controller->getCompleteStand() && (abs(x_left(4)) > 0.95 || abs(x_left(0)) > 0.8 || abs(roll_) > 1.3)) ||
       controller->getOverturn() || controller->getBaseState() == 4)
   {
     leg_length_des = controller->getDefaultLegLength();
