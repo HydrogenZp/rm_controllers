@@ -74,7 +74,7 @@ enum BalanceMode
 };
 
 constexpr std::array<std::pair<JumpPhase, const double>, 3> jumpLengthDes = {
-  { { JumpPhase::LEG_RETRACTION, 0.2 }, { JumpPhase::JUMP_UP, 0.36 }, { JumpPhase::OFF_GROUND, 0.22 } }
+  { { JumpPhase::LEG_RETRACTION, 0.12 }, { JumpPhase::JUMP_UP, 0.38 }, { JumpPhase::OFF_GROUND, 0.15 } }
 };
 
 constexpr static const int STATE_DIM = 6;
