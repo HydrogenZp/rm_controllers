@@ -122,6 +122,8 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
   else
   {
     leg_length_des = jumpLengthDes[jump_phase_].second;
+    double s_left = (left_pos_[0] - 0.12) / (0.4 - 0.12);
+    double s_right = (right_pos_[0] - 0.12) / (0.4 - 0.12);
     switch (jump_phase_)
     {
       case JumpPhase::LEG_RETRACTION:
@@ -142,10 +144,12 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
         break;
       case JumpPhase::JUMP_UP:
         ROS_INFO("[balance] ENTER JUMP_UP");
-        F_leg(0) = control_params_->p1_ * pow(left_pos_[0], 3) + control_params_->p2_ * pow(left_pos_[0], 2) +
-                   control_params_->p3_ * left_pos_[0] + control_params_->p4_ + gravity;
-        F_leg(1) = control_params_->p1_ * pow(right_pos_[0], 3) + control_params_->p2_ * pow(right_pos_[0], 2) +
-                   control_params_->p3_ * right_pos_[0] + control_params_->p4_ + gravity;
+        //        F_leg(0) = control_params_->p1_ * pow(left_pos_[0], 3) + control_params_->p2_ * pow(left_pos_[0], 2) +
+        //                   control_params_->p3_ * left_pos_[0] + control_params_->p4_ + gravity;
+        //        F_leg(1) = control_params_->p1_ * pow(right_pos_[0], 3) + control_params_->p2_ * pow(right_pos_[0], 2) +
+        //                   control_params_->p3_ * right_pos_[0] + control_params_->p4_ + gravity;
+        F_leg(0) = 400 * (1 - 3 * pow(s_left, 2) + 2 * pow(s_left, 3)) + gravity;
+        F_leg(1) = 400 * (1 - 3 * pow(s_right, 2) + 2 * pow(s_right, 3)) + gravity;
         if (current_leg_length > leg_length_des)
         {
           jumpTime_++;
@@ -158,10 +162,12 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
         break;
       case JumpPhase::OFF_GROUND:
         ROS_INFO("[balance] ENTER OFF_GROUND");
-        F_leg(0) = -(control_params_->p1_ * pow(left_pos_[0], 3) + control_params_->p2_ * pow(left_pos_[0], 2) +
-                     control_params_->p3_ * left_pos_[0] + control_params_->p4_);
-        F_leg(1) = -(control_params_->p1_ * pow(right_pos_[0], 3) + control_params_->p2_ * pow(right_pos_[0], 2) +
-                     control_params_->p3_ * right_pos_[0] + control_params_->p4_);
+        //        F_leg(0) = -(control_params_->p1_ * pow(left_pos_[0], 3) + control_params_->p2_ * pow(left_pos_[0], 2) +
+        //                     control_params_->p3_ * left_pos_[0] + control_params_->p4_);
+        //        F_leg(1) = -(control_params_->p1_ * pow(right_pos_[0], 3) + control_params_->p2_ * pow(right_pos_[0], 2) +
+        //                     control_params_->p3_ * right_pos_[0] + control_params_->p4_);
+        F_leg(0) = -400 * (1 - 3 * pow(s_left, 2) + 2 * pow(s_left, 3));
+        F_leg(1) = -400 * (1 - 3 * pow(s_right, 2) + 2 * pow(s_right, 3));
 
         if (current_leg_length < leg_length_des)
         {
