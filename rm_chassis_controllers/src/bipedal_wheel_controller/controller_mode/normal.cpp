@@ -173,7 +173,7 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
         {
           jumpTime_++;
         }
-        if (jumpTime_ >= 4)
+        if (jumpTime_ >= 8)
         {
           jumpTime_ = 0;
           jump_phase_ = JumpPhase::IDLE;
