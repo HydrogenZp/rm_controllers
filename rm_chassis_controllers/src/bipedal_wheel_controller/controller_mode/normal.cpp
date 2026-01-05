@@ -235,7 +235,8 @@ void Normal::execute(BipedalController* controller, const ros::Time& time, const
   //      controller->getCompleteStand() && abs(vel_cmd_.x) > 1.0 && abs(x_left(3)) > 0.2 &&
   //      ((left_pos_[0] + right_pos_[0]) / 2.0f) > 0.34)
   if (jump_phase_ == JumpPhase::IDLE && linear_acc_base_.z < -3.0 && controller->getCompleteStand() &&
-      abs(vel_cmd_.x) > 1.0 && abs(x_left(3)) > 0.2 && ((left_pos_[0] + right_pos_[0]) / 2.0f) > 0.34)
+      abs(vel_cmd_.x) > 1.0 && abs(x_left(3)) > 0.2 && ((left_pos_[0] + right_pos_[0]) / 2.0f) > 0.34 &&
+      leg_length_des > 0.34)
   {
     leg_length_des = controller->getDefaultLegLength();
     controller->setMode(BalanceMode::UPSTAIRS);
