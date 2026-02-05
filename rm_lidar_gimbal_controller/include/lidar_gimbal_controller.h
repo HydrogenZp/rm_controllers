@@ -69,6 +69,8 @@ public:
   void update(const ros::Time& time, const ros::Duration& period) override;
 
   void setDes(const ros::Time& time, double yaw_des, double pitch_des);
+  bool setDesIntoLimit(const tf2::Quaternion& base2gimbal_des, const urdf::JointConstSharedPtr& joint_urdf,
+                       tf2::Quaternion& base2new_des);
   void moveJoint(const ros::Time& time, const ros::Duration& period);
 
   void rate(const ros::Time& time, const ros::Duration& period);
@@ -90,6 +92,9 @@ private:
   ros::Subscriber cmd_sub_;
   realtime_tools::RealtimeBuffer<rm_msgs::GimbalCmd> cmd_buffer_;
   rm_msgs::GimbalCmd gimbal_cmd_;
+
+  // Transform
+  geometry_msgs::TransformStamped odom2gimbal_des_, odom2gimbal_, odom2base_, last_odom2base_;
 
   std::unique_ptr<realtime_tools::RealtimePublisher<rm_msgs::GimbalPosState>> yaw_state_pub_, pitch_state_pub_;
   double publish_rate_;

@@ -1,12 +1,31 @@
 #include "lidar_gimbal_controller.h"
 #include <pluginlib/class_list_macros.h>
 #include <string>
+#include <angles/angles.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <rm_common/ori_tool.h>
 #include "hardware_interface/imu_sensor_interface.h"
 #include "hardware_interface/joint_command_interface.h"
 #include "rm_common/hardware_interface/robot_state_interface.h"
 
 namespace rm_lidar_gimbal_controller
 {
+enum Axis
+{
+  ROLL = 0,
+  PITCH = 1,
+  YAW = 2
+};
+
+inline Axis getJointAxis(const urdf::JointConstSharedPtr& joint_urdf)
+{
+  if (joint_urdf->axis.x == 1)
+    return ROLL;
+  if (joint_urdf->axis.y == 1)
+    return PITCH;
+  return YAW;
+}
+
 bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& root_nh, ros::NodeHandle& controller_nh)
 {
   XmlRpc::XmlRpcValue xml_rpc_value;
@@ -82,6 +101,56 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
 void Controller::update(const ros::Time& time, const ros::Duration& period)
 {
   gimbal_cmd_ = *cmd_buffer_.readFromRT();
+}
+
+void Controller::setDes(const ros::Time& time, double yaw_des, double pitch_des)
+{
+  tf2::Quaternion odom2base, odom2gimbal_des;
+  tf2::fromMsg(odom2base_.transform.rotation, odom2base);
+  odom2gimbal_des.setRPY(0, pitch_des, yaw_des);
+  tf2::Quaternion base2gimbal_des = odom2base.inverse() * odom2gimbal_des;
+
+  // Check yaw limit
+  setDesIntoLimit(base2gimbal_des, yaw_joint_urdf_, base2gimbal_des);
+  // Check pitch limit
+  setDesIntoLimit(base2gimbal_des, pitch_joint_urdf_, base2gimbal_des);
+
+  odom2gimbal_des_.transform.rotation = tf2::toMsg(odom2base * base2gimbal_des);
+  odom2gimbal_des_.header.stamp = time;
+  robot_state_handle_.setTransform(odom2gimbal_des_, "rm_lidar_gimbal_controller");
+}
+
+bool Controller::setDesIntoLimit(const tf2::Quaternion& base2gimbal_des, const urdf::JointConstSharedPtr& joint_urdf,
+                                 tf2::Quaternion& base2new_des)
+{
+  double base2gimbal_current_des[3];
+  quatToRPY(tf2::toMsg(base2gimbal_des), base2gimbal_current_des[0], base2gimbal_current_des[1],
+            base2gimbal_current_des[2]);
+
+  double upper_limit = joint_urdf->limits ? joint_urdf->limits->upper : 1e16;
+  double lower_limit = joint_urdf->limits ? joint_urdf->limits->lower : -1e16;
+
+  // Determine which axis this joint controls
+  Axis axis = getJointAxis(joint_urdf);
+
+  if ((base2gimbal_current_des[axis] <= upper_limit && base2gimbal_current_des[axis] >= lower_limit) ||
+      (angles::two_pi_complement(base2gimbal_current_des[axis]) <= upper_limit &&
+       angles::two_pi_complement(base2gimbal_current_des[axis]) >= lower_limit))
+  {
+    base2new_des = base2gimbal_des;
+    return true;
+  }
+  else
+  {
+    // Clamp to the nearest limit
+    base2gimbal_current_des[axis] =
+        std::abs(angles::shortest_angular_distance(base2gimbal_current_des[axis], upper_limit)) <
+                std::abs(angles::shortest_angular_distance(base2gimbal_current_des[axis], lower_limit)) ?
+            upper_limit :
+            lower_limit;
+    base2new_des.setRPY(base2gimbal_current_des[ROLL], base2gimbal_current_des[PITCH], base2gimbal_current_des[YAW]);
+    return false;
+  }
 }
 
 void Controller::commandCB(const rm_msgs::GimbalCmdConstPtr& msg)
