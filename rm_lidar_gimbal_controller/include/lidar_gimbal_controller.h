@@ -54,7 +54,8 @@
 #include "ros/duration.h"
 #include "ros/node_handle.h"
 #include "ros/time.h"
-
+#include <xmlrpcpp/XmlRpcValue.h>
+#include <string>
 namespace rm_lidar_gimbal_controller
 {
 class Controller
@@ -67,9 +68,36 @@ public:
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& root_nh, ros::NodeHandle& controller_nh) override;
   void update(const ros::Time& time, const ros::Duration& period) override;
 
+  void setDes(const ros::Time& time, double yaw_des, double pitch_des);
+  void moveJoint(const ros::Time& time, const ros::Duration& period);
+
+  void rate(const ros::Time& time, const ros::Duration& period);
+  void track(const ros::Time& time, const ros::Duration& period);
+
 private:
   rm_control::RobotStateHandle robot_state_handle_;
   hardware_interface::ImuSensorHandle imu_sensor_handle_;
+  effort_controllers::JointVelocityController yaw_vel_controller_;
+  effort_controllers::JointVelocityController pitch_vel_controller_;
+
+  std::string imu_name_;
+
+  control_toolbox::Pid yaw_pos_pid_;
+  control_toolbox::Pid pitch_pos_pid_;
+  urdf::JointConstSharedPtr yaw_joint_urdf_, pitch_joint_urdf_;
+
+  ros::Subscriber cmd_sub_;
+  realtime_tools::RealtimeBuffer<rm_msgs::GimbalCmd> cmd_buffer_;
+  rm_msgs::GimbalCmd gimbal_cmd_;
+
+  std::unique_ptr<realtime_tools::RealtimePublisher<rm_msgs::GimbalPosState>> yaw_state_pub_, pitch_state_pub_;
+  double publish_rate_;
+  ros::Time last_publish_time_;
+  enum State
+  {
+    RATE,
+    TRACK
+  } state_;
 };
 
 }  // namespace rm_lidar_gimbal_controller
