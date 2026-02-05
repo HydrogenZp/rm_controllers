@@ -75,6 +75,7 @@ public:
   void track(const ros::Time& time, const ros::Duration& period);
 
 private:
+  void commandCB(const rm_msgs::GimbalCmdConstPtr& msg);
   rm_control::RobotStateHandle robot_state_handle_;
   hardware_interface::ImuSensorHandle imu_sensor_handle_;
   effort_controllers::JointVelocityController yaw_vel_controller_;

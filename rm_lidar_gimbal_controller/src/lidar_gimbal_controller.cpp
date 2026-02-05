@@ -11,8 +11,18 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
 {
   XmlRpc::XmlRpcValue xml_rpc_value;
   robot_state_handle_ = robot_hw->get<rm_control::RobotStateInterface>()->getHandle("robot_state");
-  controller_nh.getParam("imu_name", imu_name_);
-  imu_sensor_handle_ = robot_hw->get<hardware_interface::ImuSensorInterface>()->getHandle(imu_name_);
+  if (!controller_nh.getParam("imu_name", imu_name_))
+  {
+    ROS_ERROR("Param imu_name not set.");
+    return false;
+  }
+  auto* imu_interface = robot_hw->get<rm_control::RmImuSensorInterface>();
+  if (!imu_interface)
+  {
+    ROS_ERROR("Failed to get RmImuSensorInterface.");
+    return false;
+  }
+  imu_sensor_handle_ = imu_interface->getHandle(imu_name_);
 
   hardware_interface::EffortJointInterface* effort_joint_interface =
       robot_hw->get<hardware_interface::EffortJointInterface>();
@@ -63,13 +73,21 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
     ROS_ERROR("Yaw/Picth joints are not fully initialized.");
     return false;
   }
+
+  cmd_sub_ = controller_nh.subscribe<rm_msgs::GimbalCmd>("command", 1, &Controller::commandCB, this,
+                                                         ros::TransportHints().reliable().tcpNoDelay());
   return true;
 }
 
 void Controller::update(const ros::Time& time, const ros::Duration& period)
 {
+  gimbal_cmd_ = *cmd_buffer_.readFromRT();
 }
 
+void Controller::commandCB(const rm_msgs::GimbalCmdConstPtr& msg)
+{
+  cmd_buffer_.writeFromNonRT(*msg);
+}
 }  // namespace rm_lidar_gimbal_controller
 
 PLUGINLIB_EXPORT_CLASS(rm_lidar_gimbal_controller::Controller, controller_interface::ControllerBase)
