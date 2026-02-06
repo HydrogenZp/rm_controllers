@@ -122,6 +122,13 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
   gimbal_cmd_ = *cmd_buffer_.readFromRT();
 }
 
+void Controller::starting(const ros::Time& time)
+{
+  state_ = RATE;
+  state_changed_ = true;
+  start_ = true;
+}
+
 void Controller::setDes(const ros::Time& time, double yaw_des, double pitch_des)
 {
   tf2::Quaternion odom2base, odom2gimbal_des;

@@ -67,7 +67,7 @@ public:
   ~Controller() override = default;
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& root_nh, ros::NodeHandle& controller_nh) override;
   void update(const ros::Time& time, const ros::Duration& period) override;
-
+  void starting(const ros::Time& time) override;
   void setDes(const ros::Time& time, double yaw_des, double pitch_des);
   bool setDesIntoLimit(const tf2::Quaternion& base2gimbal_des, const urdf::JointConstSharedPtr& joint_urdf,
                        tf2::Quaternion& base2new_des);
