@@ -4,9 +4,11 @@
 #include <angles/angles.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <rm_common/ori_tool.h>
+#include "geometry_msgs/Vector3.h"
 #include "hardware_interface/imu_sensor_interface.h"
 #include "hardware_interface/joint_command_interface.h"
 #include "rm_common/hardware_interface/robot_state_interface.h"
+#include "tf2/convert.h"
 
 namespace rm_lidar_gimbal_controller
 {
@@ -151,6 +153,79 @@ bool Controller::setDesIntoLimit(const tf2::Quaternion& base2gimbal_des, const u
     base2new_des.setRPY(base2gimbal_current_des[ROLL], base2gimbal_current_des[PITCH], base2gimbal_current_des[YAW]);
     return false;
   }
+}
+
+void Controller::rate(const ros::Time& time, const ros::Duration& period)
+{
+  if (state_changed_)
+  {  // on enter
+    state_changed_ = false;
+    ROS_INFO("[LidarGimbal] Enter RATE");
+    if (start_)
+    {
+      odom2gimbal_des_.transform.rotation = odom2gimbal_.transform.rotation;
+      odom2gimbal_des_.header.stamp = time;
+      robot_state_handle_.setTransform(odom2gimbal_des_, "rm_lidar_gimbal_controller");
+      start_ = false;
+    }
+  }
+  else
+  {
+    double roll{}, pitch{}, yaw{};
+    quatToRPY(odom2gimbal_des_.transform.rotation, roll, pitch, yaw);
+    setDes(time, yaw + period.toSec() * gimbal_cmd_.rate_yaw, pitch + period.toSec() * gimbal_cmd_.rate_pitch);
+  }
+}
+
+void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
+{
+  geometry_msgs::Vector3 gyro, angular_vel;
+  if (has_imu_)
+  {
+    gyro.x = imu_sensor_handle_.getAngularVelocity()[0];
+    gyro.y = imu_sensor_handle_.getAngularVelocity()[1];
+    gyro.z = imu_sensor_handle_.getAngularVelocity()[2];
+    try
+    {
+      tf2::doTransform(gyro, angular_vel,
+                       robot_state_handle_.lookupTransform(odom2gimbal_.child_frame_id, imu_sensor_handle_.getFrameId(),
+                                                           time));
+    }
+    catch (tf2::TransformException& ex)
+    {
+      ROS_WARN("%s", ex.what());
+      return;
+    }
+  }
+  else
+  {
+    angular_vel.y = pitch_vel_controller_.joint_.getVelocity();
+    angular_vel.z = yaw_vel_controller_.joint_.getVelocity();
+  }
+
+  double pos_real[3]{ 0. }, pos_des[3]{ 0. }, vel_des[3]{ 0. }, angle_error[3]{ 0. };
+  quatToRPY(odom2gimbal_des_.transform.rotation, pos_des[0], pos_des[1], pos_des[2]);
+  quatToRPY(odom2gimbal_.transform.rotation, pos_real[0], pos_real[1], pos_real[2]);
+
+  for (int i = 0; i < 3; i++)
+    angle_error[i] = angles::shortest_angular_distance(pos_real[i], pos_des[i]);
+
+  if (state_ == RATE)
+  {
+    vel_des[2] = gimbal_cmd_.rate_yaw;
+    vel_des[1] = gimbal_cmd_.rate_pitch;
+  }
+
+  yaw_pos_pid_.computeCommand(angle_error[YAW], period);
+  pitch_pos_pid_.computeCommand(angle_error[PITCH], period);
+
+  yaw_vel_controller_.setCommand(yaw_pos_pid_.getCurrentCmd() + vel_des[YAW] +
+                                 yaw_vel_controller_.joint_.getVelocity() - angular_vel.z);
+  pitch_vel_controller_.setCommand(pitch_pos_pid_.getCurrentCmd() + vel_des[PITCH] +
+                                   pitch_vel_controller_.joint_.getVelocity() - angular_vel.y);
+
+  yaw_vel_controller_.update(time, period);
+  pitch_vel_controller_.update(time, period);
 }
 
 void Controller::commandCB(const rm_msgs::GimbalCmdConstPtr& msg)

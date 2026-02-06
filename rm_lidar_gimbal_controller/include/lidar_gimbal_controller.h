@@ -103,7 +103,10 @@ private:
   {
     RATE,
     TRACK
-  } state_;
+  } state_ = RATE;
+  bool has_imu_ = true;
+  bool state_changed_ = true;
+  bool start_ = true;
 };
 
 }  // namespace rm_lidar_gimbal_controller
