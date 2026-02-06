@@ -51,6 +51,7 @@
 #include <realtime_tools/realtime_publisher.h>
 #include "hardware_interface/robot_hw.h"
 #include "rm_common/hardware_interface/rm_imu_sensor_interface.h"
+#include "rm_msgs/TrackData.h"
 #include "ros/duration.h"
 #include "ros/node_handle.h"
 #include "ros/time.h"
@@ -58,6 +59,14 @@
 #include <string>
 namespace rm_lidar_gimbal_controller
 {
+struct LidarGimbalConfig
+{
+  double yaw_feedforward_gain;
+  double pitch_feedforward_gain;
+  double yaw_accel_limit;
+  double pitch_accel_limit;
+};
+
 class Controller
   : public controller_interface::MultiInterfaceController<
         hardware_interface::EffortJointInterface, rm_control::RobotStateInterface, rm_control::RmImuSensorInterface>
@@ -78,6 +87,8 @@ public:
 
 private:
   void commandCB(const rm_msgs::GimbalCmdConstPtr& msg);
+  void trackCB(const rm_msgs::TrackDataConstPtr& msg);
+
   rm_control::RobotStateHandle robot_state_handle_;
   hardware_interface::ImuSensorHandle imu_sensor_handle_;
   effort_controllers::JointVelocityController yaw_vel_controller_;
@@ -91,8 +102,10 @@ private:
 
   ros::Subscriber cmd_sub_;
   realtime_tools::RealtimeBuffer<rm_msgs::GimbalCmd> cmd_buffer_;
+  realtime_tools::RealtimeBuffer<rm_msgs::TrackData> track_buffer_;
   rm_msgs::GimbalCmd gimbal_cmd_;
-
+  rm_msgs::TrackData data_track_;
+  LidarGimbalConfig config_;
   // Transform
   geometry_msgs::TransformStamped odom2gimbal_des_, odom2gimbal_, odom2base_, last_odom2base_;
 

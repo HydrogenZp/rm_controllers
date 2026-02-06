@@ -256,6 +256,13 @@ void Controller::commandCB(const rm_msgs::GimbalCmdConstPtr& msg)
 {
   cmd_buffer_.writeFromNonRT(*msg);
 }
+void Controller::trackCB(const rm_msgs::TrackDataConstPtr& msg)
+{
+  if (msg->id == 0)
+    return;
+  track_buffer_.writeFromNonRT(*msg);
+}
+
 }  // namespace rm_lidar_gimbal_controller
 
 PLUGINLIB_EXPORT_CLASS(rm_lidar_gimbal_controller::Controller, controller_interface::ControllerBase)
