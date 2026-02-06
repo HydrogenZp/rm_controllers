@@ -8,6 +8,7 @@
 #include "hardware_interface/imu_sensor_interface.h"
 #include "hardware_interface/joint_command_interface.h"
 #include "rm_common/hardware_interface/robot_state_interface.h"
+#include "rm_common/ros_utilities.h"
 #include "tf2/convert.h"
 
 namespace rm_lidar_gimbal_controller
@@ -95,8 +96,24 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
     return false;
   }
 
+  std::string gimbal_frame_id = pitch_joint_urdf_->child_link_name;
+  std::string base_frame_id = yaw_joint_urdf_->parent_link_name;
+
+  odom2gimbal_des_.header.frame_id = "odom";
+  odom2gimbal_des_.child_frame_id = gimbal_frame_id + "_des";
+  odom2gimbal_des_.transform.rotation.w = 1.;
+
+  odom2gimbal_.header.frame_id = "odom";
+  odom2gimbal_.child_frame_id = gimbal_frame_id;
+  odom2gimbal_.transform.rotation.w = 1.;
+
+  odom2base_.header.frame_id = "odom";
+  odom2base_.child_frame_id = base_frame_id;
+  odom2base_.transform.rotation.w = 1.;
+
   cmd_sub_ = controller_nh.subscribe<rm_msgs::GimbalCmd>("command", 1, &Controller::commandCB, this,
                                                          ros::TransportHints().reliable().tcpNoDelay());
+  publish_rate_ = getParam(controller_nh, "publish_rate", 100);
   return true;
 }
 
