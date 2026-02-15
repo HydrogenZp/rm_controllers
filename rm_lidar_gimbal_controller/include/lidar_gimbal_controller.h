@@ -103,6 +103,7 @@ private:
   ros::Subscriber cmd_sub_;
   realtime_tools::RealtimeBuffer<rm_msgs::GimbalCmd> cmd_buffer_;
   realtime_tools::RealtimeBuffer<rm_msgs::TrackData> track_buffer_;
+  realtime_tools::RealtimeBuffer<LidarGimbalConfig> config_buffer_;
   rm_msgs::GimbalCmd gimbal_cmd_;
   rm_msgs::TrackData data_track_;
   LidarGimbalConfig config_;

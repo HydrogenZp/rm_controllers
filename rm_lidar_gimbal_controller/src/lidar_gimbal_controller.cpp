@@ -10,6 +10,7 @@
 #include "rm_common/hardware_interface/robot_state_interface.h"
 #include "rm_common/ros_utilities.h"
 #include "tf2/convert.h"
+#include "tf2/exceptions.h"
 
 namespace rm_lidar_gimbal_controller
 {
@@ -120,6 +121,33 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
 void Controller::update(const ros::Time& time, const ros::Duration& period)
 {
   gimbal_cmd_ = *cmd_buffer_.readFromRT();
+  config_ = *config_buffer_.readFromRT();
+  data_track_ = *track_buffer_.readFromRT();
+
+  try
+  {
+    odom2base_ = robot_state_handle_.lookupTransform("odom", odom2base_.child_frame_id, time);
+    odom2gimbal_ = robot_state_handle_.lookupTransform("odom", odom2gimbal_.child_frame_id, time);
+  }
+  catch (tf2::TransformException& ex)
+  {
+    ROS_ERROR("%s", ex.what());
+    return;
+  }
+  state_ = gimbal_cmd_.mode == rm_msgs::GimbalCmd::RATE ? RATE : TRACK;
+  switch (state_)
+  {
+    case RATE:
+      rate(time, period);
+      break;
+      // case TRACK:
+      //   track(time);
+      break;
+    default:
+      ROS_ERROR("Unknown state!");
+      break;
+  }
+  moveJoint(time, period);
 }
 
 void Controller::starting(const ros::Time& time)
