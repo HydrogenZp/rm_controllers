@@ -114,6 +114,9 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
 
   cmd_sub_ = controller_nh.subscribe<rm_msgs::GimbalCmd>("command", 1, &Controller::commandCB, this,
                                                          ros::TransportHints().reliable().tcpNoDelay());
+  rm_msgs::GimbalCmd init_cmd;
+  init_cmd.mode = rm_msgs::GimbalCmd::RATE;
+  cmd_buffer_.writeFromNonRT(init_cmd);
   publish_rate_ = getParam(controller_nh, "publish_rate", 100);
   return true;
 }
@@ -134,14 +137,19 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
     ROS_ERROR("%s", ex.what());
     return;
   }
-  state_ = gimbal_cmd_.mode == rm_msgs::GimbalCmd::RATE ? RATE : TRACK;
+  State state_des = gimbal_cmd_.mode == rm_msgs::GimbalCmd::RATE ? RATE : TRACK;
+  if (state_ != state_des)
+  {
+    state_ = state_des;
+    state_changed_ = true;
+  }
   switch (state_)
   {
     case RATE:
       rate(time, period);
       break;
-      // case TRACK:
-      //   track(time);
+    case TRACK:
+      ROS_WARN_THROTTLE(2.0, "[LidarGimbal] TRACK mode is not implemented yet, fallback to hold/rate behavior.");
       break;
     default:
       ROS_ERROR("Unknown state!");
