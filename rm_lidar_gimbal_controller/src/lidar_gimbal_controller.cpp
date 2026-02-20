@@ -1,6 +1,7 @@
 #include "lidar_gimbal_controller.h"
 #include <pluginlib/class_list_macros.h>
 #include <string>
+#include <cmath>
 #include <angles/angles.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <rm_common/ori_tool.h>
@@ -114,9 +115,14 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
 
   cmd_sub_ = controller_nh.subscribe<rm_msgs::GimbalCmd>("command", 1, &Controller::commandCB, this,
                                                          ros::TransportHints().reliable().tcpNoDelay());
+  track_sub_ = controller_nh.subscribe<rm_msgs::TrackData>("/track", 1, &Controller::trackCB, this,
+                                                           ros::TransportHints().reliable().tcpNoDelay());
   rm_msgs::GimbalCmd init_cmd;
   init_cmd.mode = rm_msgs::GimbalCmd::RATE;
   cmd_buffer_.writeFromNonRT(init_cmd);
+  rm_msgs::TrackData init_track;
+  init_track.id = 0;
+  track_buffer_.writeFromNonRT(init_track);
   publish_rate_ = getParam(controller_nh, "publish_rate", 100);
   return true;
 }
@@ -149,7 +155,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
       rate(time, period);
       break;
     case TRACK:
-      ROS_WARN_THROTTLE(2.0, "[LidarGimbal] TRACK mode is not implemented yet, fallback to hold/rate behavior.");
+      track(time, period);
       break;
     default:
       ROS_ERROR("Unknown state!");
@@ -237,6 +243,48 @@ void Controller::rate(const ros::Time& time, const ros::Duration& period)
   }
 }
 
+void Controller::track(const ros::Time& time, const ros::Duration& period)
+{
+  (void)period;
+  if (state_changed_)
+  {  // on enter
+    state_changed_ = false;
+    ROS_INFO("[LidarGimbal] Enter TRACK");
+  }
+
+  geometry_msgs::Point aim_point_odom = data_track_.position;
+  double dt_sec = 0.0;
+  if (!data_track_.header.stamp.isZero())
+    dt_sec = std::max(0.0, (time - data_track_.header.stamp).toSec());
+  aim_point_odom.x += data_track_.velocity.x * dt_sec;
+  aim_point_odom.y += data_track_.velocity.y * dt_sec;
+  aim_point_odom.z += data_track_.velocity.z * dt_sec;
+
+  try
+  {
+    if (!data_track_.header.frame_id.empty())
+      tf2::doTransform(aim_point_odom, aim_point_odom,
+                       robot_state_handle_.lookupTransform("odom", data_track_.header.frame_id,
+                                                           data_track_.header.stamp));
+  }
+  catch (tf2::TransformException& ex)
+  {
+    ROS_WARN("%s", ex.what());
+    return;
+  }
+
+  const double dx = aim_point_odom.x - odom2gimbal_.transform.translation.x;
+  const double dy = aim_point_odom.y - odom2gimbal_.transform.translation.y;
+  const double dz = aim_point_odom.z - odom2gimbal_.transform.translation.z;
+  const double dist_xy = std::hypot(dx, dy);
+  if (dist_xy < 1e-6)
+    return;
+
+  const double yaw = std::atan2(dy, dx);
+  const double pitch = -std::atan2(dz, dist_xy);
+  setDes(time, yaw, pitch);
+}
+
 void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
 {
   geometry_msgs::Vector3 gyro, angular_vel;
@@ -294,8 +342,6 @@ void Controller::commandCB(const rm_msgs::GimbalCmdConstPtr& msg)
 }
 void Controller::trackCB(const rm_msgs::TrackDataConstPtr& msg)
 {
-  if (msg->id == 0)
-    return;
   track_buffer_.writeFromNonRT(*msg);
 }
 

@@ -101,6 +101,7 @@ private:
   urdf::JointConstSharedPtr yaw_joint_urdf_, pitch_joint_urdf_;
 
   ros::Subscriber cmd_sub_;
+  ros::Subscriber track_sub_;
   realtime_tools::RealtimeBuffer<rm_msgs::GimbalCmd> cmd_buffer_;
   realtime_tools::RealtimeBuffer<rm_msgs::TrackData> track_buffer_;
   realtime_tools::RealtimeBuffer<LidarGimbalConfig> config_buffer_;
