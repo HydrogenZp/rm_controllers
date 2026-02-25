@@ -252,36 +252,61 @@ void Controller::track(const ros::Time& time, const ros::Duration& period)
     ROS_INFO("[LidarGimbal] Enter TRACK");
   }
 
-  geometry_msgs::Point aim_point_odom = data_track_.position;
-  double dt_sec = 0.0;
-  if (!data_track_.header.stamp.isZero())
-    dt_sec = std::max(0.0, (time - data_track_.header.stamp).toSec());
-  aim_point_odom.x += data_track_.velocity.x * dt_sec;
-  aim_point_odom.y += data_track_.velocity.y * dt_sec;
-  aim_point_odom.z += data_track_.velocity.z * dt_sec;
+  geometry_msgs::Point aim_point_odom;
+  bool has_aim_point = false;
+  const bool track_is_fresh = has_track_msg_ && (time - last_track_msg_time_) < ros::Duration(0.3);
+  if (track_is_fresh)
+  {
+    aim_point_odom = data_track_.position;
+    double dt_sec = 0.0;
+    if (!data_track_.header.stamp.isZero())
+      dt_sec = std::max(0.0, (time - data_track_.header.stamp).toSec());
+    aim_point_odom.x += data_track_.velocity.x * dt_sec;
+    aim_point_odom.y += data_track_.velocity.y * dt_sec;
+    aim_point_odom.z += data_track_.velocity.z * dt_sec;
+    try
+    {
+      if (!data_track_.header.frame_id.empty())
+        tf2::doTransform(aim_point_odom, aim_point_odom,
+                         robot_state_handle_.lookupTransform("odom", data_track_.header.frame_id,
+                                                             data_track_.header.stamp));
+      has_aim_point = true;
+    }
+    catch (tf2::TransformException& ex)
+    {
+      ROS_WARN_THROTTLE(1.0, "%s", ex.what());
+    }
+  }
 
-  try
+  if (!has_aim_point)
   {
-    if (!data_track_.header.frame_id.empty())
-      tf2::doTransform(aim_point_odom, aim_point_odom,
-                       robot_state_handle_.lookupTransform("odom", data_track_.header.frame_id,
-                                                           data_track_.header.stamp));
+    aim_point_odom = gimbal_cmd_.target_pos.point;
+    try
+    {
+      if (!gimbal_cmd_.target_pos.header.frame_id.empty())
+        tf2::doTransform(aim_point_odom, aim_point_odom,
+                         robot_state_handle_.lookupTransform("odom", gimbal_cmd_.target_pos.header.frame_id,
+                                                             gimbal_cmd_.target_pos.header.stamp));
+      has_aim_point = true;
+    }
+    catch (tf2::TransformException& ex)
+    {
+      ROS_WARN_THROTTLE(1.0, "%s", ex.what());
+      return;
+    }
   }
-  catch (tf2::TransformException& ex)
-  {
-    ROS_WARN("%s", ex.what());
+
+  if (!has_aim_point)
     return;
-  }
 
   const double dx = aim_point_odom.x - odom2gimbal_.transform.translation.x;
   const double dy = aim_point_odom.y - odom2gimbal_.transform.translation.y;
   const double dz = aim_point_odom.z - odom2gimbal_.transform.translation.z;
   const double dist_xy = std::hypot(dx, dy);
-  if (dist_xy < 1e-6)
-    return;
-
-  const double yaw = std::atan2(dy, dx);
-  const double pitch = -std::atan2(dz, dist_xy);
+  double roll_des{}, pitch_des{}, yaw_des{};
+  quatToRPY(odom2gimbal_des_.transform.rotation, roll_des, pitch_des, yaw_des);
+  const double yaw = dist_xy < 1e-6 ? yaw_des : std::atan2(dy, dx);
+  const double pitch = -std::atan2(dz, std::max(dist_xy, 1e-6));
   setDes(time, yaw, pitch);
 }
 
@@ -343,6 +368,8 @@ void Controller::commandCB(const rm_msgs::GimbalCmdConstPtr& msg)
 void Controller::trackCB(const rm_msgs::TrackDataConstPtr& msg)
 {
   track_buffer_.writeFromNonRT(*msg);
+  has_track_msg_ = true;
+  last_track_msg_time_ = ros::Time::now();
 }
 
 }  // namespace rm_lidar_gimbal_controller

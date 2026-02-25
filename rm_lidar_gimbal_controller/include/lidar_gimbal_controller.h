@@ -108,6 +108,8 @@ private:
   rm_msgs::GimbalCmd gimbal_cmd_;
   rm_msgs::TrackData data_track_;
   LidarGimbalConfig config_;
+  bool has_track_msg_{ false };
+  ros::Time last_track_msg_time_;
   // Transform
   geometry_msgs::TransformStamped odom2gimbal_des_, odom2gimbal_, odom2base_, last_odom2base_;
 
