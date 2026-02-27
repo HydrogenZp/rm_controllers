@@ -10,7 +10,9 @@
 #include <rm_msgs/LeggedLQRStatus.h>
 #include <rm_msgs/LQRkMatrix.h>
 #include <rm_msgs/LeggedChassisMode.h>
+#include <rm_msgs/LeggedUpstairStatus.h>
 #include <rm_common/filters/kalman_filter.h>
+#include <rm_common/filters/lp_filter.h>
 #include <control_toolbox/pid.h>
 #include <controller_interface/multi_interface_controller.h>
 #include <geometry_msgs/TwistStamped.h>
@@ -37,6 +39,7 @@ public:
   bool init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& root_nh, ros::NodeHandle& controller_nh) override;
   void moveJoint(const ros::Time& time, const ros::Duration& period) override;
   void stopping(const ros::Time& time) override;
+  //  void follow(const ros::Time& time, const ros::Duration& period) override;
 
   // clang-format off
   bool getOverturn() const{ return overturn_; }
@@ -46,6 +49,7 @@ public:
   const std::shared_ptr<ModelParams>& getModelParams() const { return model_params_; }
   const std::shared_ptr<ControlParams>& getControlParams() const { return control_params_; }
   const std::shared_ptr<BiasParams>& getBiasParams() const { return bias_params_; }
+  const std::shared_ptr<LegStateThresholdParams>& getLegThresholdParams() const { return leg_threshold_params_; }
   double getLegCmd() const{ return legCmd_; }
   double getJumpCmd() const{ return jumpCmd_; }
   int getBaseState() const{ return state_; }
@@ -62,7 +66,7 @@ public:
                     Eigen::Matrix<double, STATE_DIM, 1> left_ref, Eigen::Matrix<double, STATE_DIM, 1> right_ref,
                     Eigen::Matrix<double, CONTROL_DIM, 1> u_left, Eigen::Matrix<double, CONTROL_DIM, 1> u_right,
                     Eigen::Matrix<double, CONTROL_DIM, 1> F_leg_, const bool unstick[2]) const;
-  void pubLegLenStatus(const bool& is_high_leg_flag);
+void pubLegLenStatus(const bool& upstair_flag);
   // clang-format on
   void clearStatus();
 
@@ -72,6 +76,7 @@ private:
   bool setupLQR(ros::NodeHandle& controller_nh);
   bool setupControlParams(ros::NodeHandle& controller_nh);
   bool setupBiasParams(ros::NodeHandle& controller_nh);
+  bool setupThresholdParams(ros::NodeHandle& controller_nh);
   void polyfit(const std::vector<Eigen::Matrix<double, 2, 6>>& Ks, const std::vector<double>& L0s,
                Eigen::Matrix<double, 4, 12>& coeffs);
   geometry_msgs::Twist odometry() override;
@@ -82,6 +87,7 @@ private:
   std::shared_ptr<ModelParams> model_params_;
   std::shared_ptr<ControlParams> control_params_;
   std::shared_ptr<BiasParams> bias_params_;
+  std::shared_ptr<LegStateThresholdParams> leg_threshold_params_;
 
   int balance_mode_ = BalanceMode::SIT_DOWN;
   bool balance_state_changed_ = false;
@@ -95,6 +101,8 @@ private:
   Eigen::Matrix<double, 2, 2> A_, B_, H_, Q_, R_;
   Eigen::Matrix<double, 2, 1> X_, U_;
   std::shared_ptr<KalmanFilter<double>> kalmanFilterPtr_;
+  std::shared_ptr<LowPassFilter> left_leg_angle_lpFilterPtr_, right_leg_angle_lpFilterPtr_,
+      left_leg_angle_vel_lpFilterPtr_, right_leg_angle_vel_lpFilterPtr_;
 
   Eigen::Matrix<double, STATE_DIM, 1> x_left_{}, x_right_{};
   double default_leg_length_{ 0.2 };
@@ -115,7 +123,7 @@ private:
 
   // ROS Interface
   ros::Subscriber leg_cmd_sub_;
-  ros::Publisher unstick_pub_, leg_len_status_pub_;
+  ros::Publisher unstick_pub_, upstair_status_pub_;
   ros::Publisher legged_chassis_status_pub_, legged_chassis_mode_pub_;
   ros::Publisher lqr_status_pub_;
   ros::Time cmd_update_time_;
