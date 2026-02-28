@@ -25,17 +25,11 @@ enum Axis
 inline Axis getJointAxis(const urdf::JointConstSharedPtr& joint_urdf)
 {
   if (joint_urdf->axis.x == 1)
-  {
     return ROLL;
-  }
   if (joint_urdf->axis.y == 1)
-  {
     return PITCH;
-  }
   if (joint_urdf->axis.z == 1)
-  {
     return YAW;
-  }
 
   ROS_ERROR("Joint axis is not valid");
   return YAW;
