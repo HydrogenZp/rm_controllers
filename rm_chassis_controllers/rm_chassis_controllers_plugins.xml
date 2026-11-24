@@ -1,3 +1,4 @@
+<class_libraries>
 <library path="lib/librm_chassis_controllers">
 
     <class name="rm_chassis_controllers/OmniController"
@@ -56,3 +57,9 @@
     </class>
 
 </library>
+  <library path="lib/librm_serial_leg_rl">
+    <class name="rm_chassis_controllers/SerialLegRlController"
+           type="rm_chassis_controllers::SerialLegRlController"
+           base_class_type="controller_interface::ControllerBase"/>
+  </library>
+</class_libraries>

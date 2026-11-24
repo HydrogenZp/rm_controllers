@@ -101,6 +101,23 @@ target_link_libraries(${PROJECT_NAME}
 
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
+option(RM_BUILD_SERIAL_LEG_RL "Build the serial-leg ONNX controller" OFF)
+if(RM_BUILD_SERIAL_LEG_RL)
+  set(ONNXRUNTIME_ROOT "" CACHE PATH "ONNX Runtime SDK directory")
+  find_path(ONNXRUNTIME_INCLUDE_DIR onnxruntime_cxx_api.h HINTS "${ONNXRUNTIME_ROOT}/include")
+  find_library(ONNXRUNTIME_LIBRARY onnxruntime HINTS "${ONNXRUNTIME_ROOT}/lib" "${ONNXRUNTIME_ROOT}/lib64")
+  if(NOT ONNXRUNTIME_INCLUDE_DIR OR NOT ONNXRUNTIME_LIBRARY)
+    message(FATAL_ERROR "Set ONNXRUNTIME_ROOT to the ONNX Runtime SDK directory")
+  endif()
+  find_package(Threads REQUIRED)
+  add_library(rm_serial_leg_rl SHARED src/serial_leg_rl/controller.cpp)
+  target_link_libraries(rm_serial_leg_rl PRIVATE ${PROJECT_NAME} ${catkin_LIBRARIES}
+    "${ONNXRUNTIME_LIBRARY}" Threads::Threads)
+  target_include_directories(rm_serial_leg_rl SYSTEM PRIVATE "${ONNXRUNTIME_INCLUDE_DIR}")
+  add_dependencies(rm_serial_leg_rl ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
+  install(TARGETS rm_serial_leg_rl LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
+endif()
+
 #############
 ## Install ##
 #############
